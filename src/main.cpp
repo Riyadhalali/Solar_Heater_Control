@@ -10,7 +10,7 @@ SevSeg sevseg; //Instantiate a seven segment object
 float value;
 float voltage;
 int voltage_int;
-byte A=A1,B=12,C=5,D=3,E=2,F=A0,G=6,H=4;   // define pins 
+byte A=A1,B=12,C=5,D=3,E=8,F=A0,G=6,H=4;   // define pins 
 byte Display_1=A2,Display_2=11,Display_3=13; // define display ports control 
 //--------------------------------------Functions Declartion---------------------------------------
 void GPIO_Init()
@@ -37,12 +37,12 @@ void setup() {
   // put your setup code here, to run once:
 Segment_Init();
 
-}git init
-
+}
+//-> start developing
 void loop() {
   // put your main code here, to run repeatedly:
   sevseg.setNumber(310); // Displays '3.141'
- sevseg.refreshDisplay();
- delay(1000);
+  sevseg.refreshDisplay();
+
     
 }
