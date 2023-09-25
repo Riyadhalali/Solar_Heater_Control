@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "SevSeg.h"
+#include <PID_v1.h>
 
 //--------------------------------------Special Defines---------------------------------------------
 SevSeg sevseg; //Instantiate a seven segment object
@@ -8,12 +9,20 @@ SevSeg sevseg; //Instantiate a seven segment object
 #define Enter A5
 #define Up 1
 #define Down 0
+#define PWM 9
+
 //----------------------------------------Variables-------------------------------------------------
 byte A=A1,B=12,C=5,D=3,E=8,F=A0,G=6,H=4;   // define pins 
 byte Display_1=A2,Display_2=11,Display_3=13; // define display ports control 
 float Battery_Voltage=0,Vin_Battery=0;
 unsigned int  ADC_Value=0;  
 char txt[32];
+//Define Variables we'll be connecting to
+double Setpoint=75, Input, Output;
+//Specify the links and initial tuning parameters
+double Kp=0, Ki=10 ,Kd=0;
+//--------------------------------------PID Start-------------------------------------------------
+PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 
@@ -77,8 +86,13 @@ void Segment_Timer_Update ()
     TCNT2=0;    // very important 
     sevseg.setNumberF(Vin_Battery,1); // Displays '3.141'
     sevseg.refreshDisplay();
-
-
+ }
+ //---------------------------------PID CONFIG--------------------------------------------
+ void PID_Config()
+ {
+   //turn the PID on
+ myPID.SetMode(AUTOMATIC);
+ //myPID.SetSampleTime(200); 
  }
 //*****************************************MAIN LOOP********************************************
 void setup() {
@@ -86,12 +100,16 @@ void setup() {
 Segment_Init();
 GPIO_Init(); 
 Segment_Timer_Update();
+PID_Config();
 
 }
 //-> start developing
 void loop() {
   // put your main code here, to run repeatedly:
  Read_Battery();
+ Input=map(ADC_Value,0,1024,0,255);
+ myPID.Compute();
+ analogWrite(PWM, Output);
  //sevseg.setNumber(314); // Displays '3.141'
  //sevseg.refreshDisplay();   
 }
