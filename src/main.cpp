@@ -24,6 +24,7 @@ double highestPowerInverter=50;
 uint16_t ScreenTimer=0;
 float cutVoltage=25.0;
 double PID_Value,PID_P,PID_I,PID_Error;
+double HeatingPower=0;
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 
@@ -45,8 +46,8 @@ Serial.begin(9600);
 //----------------------------------------7 Segment Init----------------------------------------
 void Segment_Init()
 {
-  byte numDigits = 4;
-  byte digitPins[] = {A2, 11, 13,A5};
+  byte numDigits = 3;
+  byte digitPins[] = {A2, 11, 13};
   byte segmentPins[] = {A, B, C, D, E, F, G, H};
   bool resistorsOnSegments = false; // 'false' means resistors are on digit pins
   byte hardwareConfig = COMMON_ANODE; // See README.md for options
@@ -92,21 +93,21 @@ void Segment_Timer_Update ()
  {
 
     TCNT2=0;    // very important 
-     sevseg.setNumberF(OCR1A); // Displays '3.141'
-     sevseg.refreshDisplay(); 
- 
-   /* if (ScreenTimer<1000)
+    ScreenTimer++;
+  
+   if (ScreenTimer> 0 && ScreenTimer < 1000)
     {
     sevseg.setNumberF(Vin_Battery,1); // Displays '3.141'
     sevseg.refreshDisplay();
     }
-    else if (ScreenTimer>100 && ScreenTimer< 200) 
+    if (ScreenTimer>1000 && ScreenTimer< 2000) 
     {
-    sevseg.setNumberF(Output); // Displays '3.141'
+    sevseg.setNumberF(HeatingPower); // Displays '3.141'
     sevseg.refreshDisplay(); 
-    ScreenTimer=0;
     }
-  */
+    if (ScreenTimer > 2000) ScreenTimer=0; 
+     
+  
  }
   //-----------------------------Write PWM----------------------------------------
 void PWM_Init()
@@ -135,13 +136,9 @@ PID_Value=PID_P+PID_I ;
 // to make range of pid 
 if (PID_Value <0) PID_Value=0;
 if (PID_Value > 2500) PID_Value=2500; 
-
 //analogWrite(PWM,PID_Value) ; 
 OCR1A=PID_Value;
-
-
-
-
+HeatingPower=map(PID_Value,0,2500,0,100); // map pid value 
 }
 //*****************************************MAIN LOOP********************************************
 void setup() {
