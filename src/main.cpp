@@ -17,7 +17,7 @@ float Battery_Voltage=0,Vin_Battery=0;
 unsigned int  ADC_Value=0;  
 char txt[32];
 //Define Variables we'll be connecting to
-double Setpoint=48.3, Input, Output; // set point is the desired value for heating 
+double Setpoint=27.5, Input, Output; // set point is the desired value for heating 
 //Specify the links and initial tuning parameters
 double Kp=10, Ki=5,Kd=0;
 double highestPowerInverter=50;
@@ -45,8 +45,8 @@ Serial.begin(9600);
 //----------------------------------------7 Segment Init----------------------------------------
 void Segment_Init()
 {
-  byte numDigits = 3;
-  byte digitPins[] = {A2, 11, 13};
+  byte numDigits = 4;
+  byte digitPins[] = {A2, 11, 13,A5};
   byte segmentPins[] = {A, B, C, D, E, F, G, H};
   bool resistorsOnSegments = false; // 'false' means resistors are on digit pins
   byte hardwareConfig = COMMON_ANODE; // See README.md for options
@@ -92,8 +92,8 @@ void Segment_Timer_Update ()
  {
 
     TCNT2=0;    // very important 
-     sevseg.setNumberF(PID_Value); // Displays '3.141'
-    sevseg.refreshDisplay(); 
+     sevseg.setNumberF(OCR1A); // Displays '3.141'
+     sevseg.refreshDisplay(); 
  
    /* if (ScreenTimer<1000)
     {
@@ -111,12 +111,17 @@ void Segment_Timer_Update ()
   //-----------------------------Write PWM----------------------------------------
 void PWM_Init()
 {
-TCCR1A=0; 
-TCCR1B=0 ; 
-TCCR1A |= (1<<COM1A1) | (1<<COM1A0) | (1<<WGM11) | (1<<WGM12)  | (1<<WGM13) ; //Set OC1A/OC1B on Compare Match and set mode 14 
+TCCR1A=0;
+TCCR1B=0;
+TCCR1A |= (1<<COM1A1)  ; //clear OC1A/OC1B on Compare Match and set mode 14 
+TCCR1A |= (1 << WGM11);
+TCCR1B |= (1 << WGM12);
+TCCR1B |= (1 << WGM13);
 TCCR1B |= (1<<CS10) | (1<<CS11) ; // prescalar 64 
 ICR1=2500;
 }
+
+
 void PID_Compute()
 {
  // calculate error 
@@ -129,9 +134,10 @@ PID_I=PID_I+ (Ki*PID_Error);
 PID_Value=PID_P+PID_I ; 
 // to make range of pid 
 if (PID_Value <0) PID_Value=0;
-if (PID_Value > 255) PID_Value=255; 
+if (PID_Value > 2500) PID_Value=2500; 
 
-analogWrite(PWM,PID_Value) ; 
+//analogWrite(PWM,PID_Value) ; 
+OCR1A=PID_Value;
 
 
 
@@ -143,16 +149,13 @@ void setup() {
 Segment_Init();
 GPIO_Init(); 
 Segment_Timer_Update();
-//PWM_Init(); 
+PWM_Init(); 
 }
 //-> start developing
 void loop() {
   // put your main code here, to run repeatedly:
    Read_Battery();
    PID_Compute();
-  // myPID.Compute();
-  // analogWrite(PWM, Output);
-   //Serial.println(Input);
-   //Serial.println(Output);
+
 
 }
