@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include "SevSeg.h"
-#include <PID_v1.h>
 
 //--------------------------------------Special Defines---------------------------------------------
 SevSeg sevseg; //Instantiate a seven segment object
@@ -9,7 +8,7 @@ SevSeg sevseg; //Instantiate a seven segment object
 #define Enter A5
 #define Up 1
 #define Down 0
-#define PWM 9
+#define PWM 9	
 
 //----------------------------------------Variables-------------------------------------------------
 byte A=A1,B=12,C=5,D=3,E=8,F=A0,G=6,H=4;   // define pins 
@@ -18,11 +17,13 @@ float Battery_Voltage=0,Vin_Battery=0;
 unsigned int  ADC_Value=0;  
 char txt[32];
 //Define Variables we'll be connecting to
-double Setpoint=75, Input, Output;
+double Setpoint=48.3, Input, Output; // set point is the desired value for heating 
 //Specify the links and initial tuning parameters
-double Kp=0, Ki=10 ,Kd=0;
-//--------------------------------------PID Start-------------------------------------------------
-PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+double Kp=10, Ki=5,Kd=0;
+double highestPowerInverter=50;
+uint16_t ScreenTimer=0;
+float cutVoltage=25.0;
+double PID_Value,PID_P,PID_I,PID_Error;
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 
@@ -37,7 +38,9 @@ pinMode(AC_Available_Inverter,INPUT);
 pinMode(Enter,INPUT);
 pinMode(Up,INPUT);
 pinMode(Down,INPUT);
+pinMode(PWM,OUTPUT);
 pinMode(A3,INPUT);  // battery voltage reading 
+Serial.begin(9600);
 }
 //----------------------------------------7 Segment Init----------------------------------------
 void Segment_Init()
@@ -57,7 +60,9 @@ void Segment_Init()
 void Read_Battery()
 {
 float sum=0 , Battery[10];
+float ADC_PID=512;
 ADC_Value=analogRead(A3);
+
 Battery_Voltage=(ADC_Value *5.0)/1024.0;
 
 for ( char i=0; i<10 ; i++)
@@ -68,48 +73,86 @@ sum+=Battery[i];
 }
 
 Vin_Battery= sum/10.0;
+
 }
 //-------------------------------------Timer for updating screen reads--------------------------
 void Segment_Timer_Update ()
 {
+  
  noInterrupts();
  TCCR2=0; 
  TCCR2|= (1<<WGM21);   //choosing compare output mode for timer 2
  TCCR2|=(1<<CS22) | (1 <<CS21 ) | ( 1<< CS20) ;    //choosing 1024 prescalar so we can get 1 ms delay for updating Dipslay
- OCR2=40;
+ OCR2=20;
  TIMSK |= (1<<OCIE2);     //enabling interrupt
  TIMSK |= (1<<OCF2); 
  interrupts(); 
 }
  ISR(TIMER2_COMP_vect) 
  {
+
     TCNT2=0;    // very important 
+     sevseg.setNumberF(PID_Value); // Displays '3.141'
+    sevseg.refreshDisplay(); 
+ 
+   /* if (ScreenTimer<1000)
+    {
     sevseg.setNumberF(Vin_Battery,1); // Displays '3.141'
     sevseg.refreshDisplay();
+    }
+    else if (ScreenTimer>100 && ScreenTimer< 200) 
+    {
+    sevseg.setNumberF(Output); // Displays '3.141'
+    sevseg.refreshDisplay(); 
+    ScreenTimer=0;
+    }
+  */
  }
- //---------------------------------PID CONFIG--------------------------------------------
- void PID_Config()
- {
-   //turn the PID on
- myPID.SetMode(AUTOMATIC);
- //myPID.SetSampleTime(200); 
- }
+  //-----------------------------Write PWM----------------------------------------
+void PWM_Init()
+{
+TCCR1A=0; 
+TCCR1B=0 ; 
+TCCR1A |= (1<<COM1A1) | (1<<COM1A0) | (1<<WGM11) | (1<<WGM12)  | (1<<WGM13) ; //Set OC1A/OC1B on Compare Match and set mode 14 
+TCCR1B |= (1<<CS10) | (1<<CS11) ; // prescalar 64 
+ICR1=2500;
+}
+void PID_Compute()
+{
+ // calculate error 
+PID_Error=Vin_Battery-Setpoint; 
+ //calculate the p value 
+PID_P=Kp*PID_Error; 
+// calculate the I controller 
+PID_I=PID_I+ (Ki*PID_Error);
+// calcaulte the pid value final 
+PID_Value=PID_P+PID_I ; 
+// to make range of pid 
+if (PID_Value <0) PID_Value=0;
+if (PID_Value > 255) PID_Value=255; 
+
+analogWrite(PWM,PID_Value) ; 
+
+
+
+
+}
 //*****************************************MAIN LOOP********************************************
 void setup() {
   // put your setup code here, to run once:
 Segment_Init();
 GPIO_Init(); 
 Segment_Timer_Update();
-PID_Config();
-
+//PWM_Init(); 
 }
 //-> start developing
 void loop() {
   // put your main code here, to run repeatedly:
- Read_Battery();
- Input=map(ADC_Value,0,1024,0,255);
- myPID.Compute();
- analogWrite(PWM, Output);
- //sevseg.setNumber(314); // Displays '3.141'
- //sevseg.refreshDisplay();   
+   Read_Battery();
+   PID_Compute();
+  // myPID.Compute();
+  // analogWrite(PWM, Output);
+   //Serial.println(Input);
+   //Serial.println(Output);
+
 }
