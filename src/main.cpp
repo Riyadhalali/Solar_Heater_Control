@@ -3,8 +3,8 @@
 
 //--------------------------------------Special Defines---------------------------------------------
 SevSeg sevseg; //Instantiate a seven segment object
-#define AC_Available_Grid 2
-#define AC_Available_Inverter 7
+#define AC_Available_Grid 7
+#define AC_Available_Inverter 2
 #define Enter A5
 #define Up 1
 #define Down 0
@@ -25,9 +25,10 @@ uint16_t ScreenTimer=0;
 float cutVoltage=25.0;
 double PID_Value,PID_P,PID_I,PID_Error;
 double HeatingPower=0;
+int x=0,y=0;
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
-
+void AC_Control();
 
 
 
@@ -41,7 +42,29 @@ pinMode(Up,INPUT);
 pinMode(Down,INPUT);
 pinMode(PWM,OUTPUT);
 pinMode(A3,INPUT);  // battery voltage reading 
+attachInterrupt(digitalPinToInterrupt(2),AC_Control,RISING);
 Serial.begin(9600);
+}
+
+//-----------------------------------------Interrupt-------------------------------------------
+void AC_Control()
+{
+digitalWrite(PWM,HIGH);
+delayMicroseconds(x);
+digitalWrite(PWM,LOW);
+/*
+ delayMicroseconds(x); // read AD0
+ digitalWrite(PWM, HIGH);
+  
+  // Serial.println(digitalRead(triacPulse));
+  
+  delayMicroseconds(50);  //delay 50 uSec on output pulse to turn on triac
+  digitalWrite(PWM, LOW);
+
+
+
+*/
+
 }
 //----------------------------------------7 Segment Init----------------------------------------
 void Segment_Init()
@@ -84,7 +107,7 @@ void Segment_Timer_Update ()
  TCCR2=0; 
  TCCR2|= (1<<WGM21);   //choosing compare output mode for timer 2
  TCCR2|=(1<<CS22) | (1 <<CS21 ) | ( 1<< CS20) ;    //choosing 1024 prescalar so we can get 1 ms delay for updating Dipslay
- OCR2=20;
+ OCR2=10;
  TIMSK |= (1<<OCIE2);     //enabling interrupt
  TIMSK |= (1<<OCF2); 
  interrupts(); 
@@ -102,7 +125,7 @@ void Segment_Timer_Update ()
     }
     if (ScreenTimer>1000 && ScreenTimer< 2000) 
     {
-    sevseg.setNumberF(HeatingPower); // Displays '3.141'
+    sevseg.setNumberF(y); // Displays '3.141'
     sevseg.refreshDisplay(); 
     }
     if (ScreenTimer > 2000) ScreenTimer=0; 
@@ -129,8 +152,12 @@ void PID_Compute()
 PID_Error=Vin_Battery-Setpoint; 
  //calculate the p value 
 PID_P=Kp*PID_Error; 
+if (PID_P <0) PID_P=0;
+if (PID_P > 2500) PID_P=2500; 
 // calculate the I controller 
 PID_I=PID_I+ (Ki*PID_Error);
+if (PID_I <0) PID_I=0;
+if (PID_I > 2500) PID_I=2500; 
 // calcaulte the pid value final 
 PID_Value=PID_P+PID_I ; 
 // to make range of pid 
@@ -146,13 +173,14 @@ void setup() {
 Segment_Init();
 GPIO_Init(); 
 Segment_Timer_Update();
-PWM_Init(); 
+//PWM_Init(); 
 }
 //-> start developing
 void loop() {
   // put your main code here, to run repeatedly:
    Read_Battery();
-   PID_Compute();
-
-
+   //PID_Compute();
+  y=analogRead(A3);
+  x=map(y,0,1023,0,10000); // 0 - 10ms 
+  
 }
