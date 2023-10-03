@@ -113,7 +113,7 @@ void Segment_Timer_Update ()
     }
     if (ScreenTimer>1000 && ScreenTimer< 2000) 
     {
-    sevseg.setNumberF(y); // Displays '3.141'
+    sevseg.setNumber(HeatingPower); // Displays '3.141'
     sevseg.refreshDisplay(); 
     }
     if (ScreenTimer > 2000) ScreenTimer=0; 
@@ -141,19 +141,21 @@ PID_Error=Vin_Battery-Setpoint;
  //calculate the p value 
 PID_P=Kp*PID_Error; 
 if (PID_P <0) PID_P=0;
-if (PID_P > 2500) PID_P=2500; 
+if (PID_P > 5000) PID_P=5000; 
 // calculate the I controller 
 PID_I=PID_I+ (Ki*PID_Error);
 if (PID_I <0) PID_I=0;
-if (PID_I > 2500) PID_I=2500; 
+if (PID_I > 5000) PID_I=5000; 
 // calcaulte the pid value final 
 PID_Value=PID_P+PID_I ; 
 // to make range of pid 
 if (PID_Value <0) PID_Value=0;
 if (PID_Value > 5000) PID_Value=5000; 
 //analogWrite(PWM,PID_Value) ; 
-OCR1A=PID_Value;
-HeatingPower=map(PID_Value,0,2500,0,100); // map pid value 
+//OCR1A=PID_Value;
+HeatingPower=map(PID_Value,0,5000,0,100); // map pid value 
+x=map(PID_Value,0,5000,5000,0);
+
 }
 //*****************************************MAIN LOOP********************************************
 void setup() {
@@ -167,8 +169,8 @@ Segment_Timer_Update();
 void loop() {
   // put your main code here, to run repeatedly:
    Read_Battery();
-   //PID_Compute();
-   y=analogRead(A3);
-   x=map(y,0,1023,5000,0); // 0 - 10ms 
+   PID_Compute();
+   //y=analogRead(A3);
+   //x=map(y,0,1023,5000,0); // 0 - 10ms 
 
 }
