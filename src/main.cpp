@@ -42,29 +42,17 @@ pinMode(Up,INPUT);
 pinMode(Down,INPUT);
 pinMode(PWM,OUTPUT);
 pinMode(A3,INPUT);  // battery voltage reading 
-attachInterrupt(digitalPinToInterrupt(2),AC_Control,RISING);
+attachInterrupt(digitalPinToInterrupt(2),AC_Control,FALLING);
 Serial.begin(9600);
 }
 
 //-----------------------------------------Interrupt-------------------------------------------
 void AC_Control()
 {
-digitalWrite(PWM,HIGH);
-delayMicroseconds(x);
-digitalWrite(PWM,LOW);
-/*
- delayMicroseconds(x); // read AD0
- digitalWrite(PWM, HIGH);
-  
-  // Serial.println(digitalRead(triacPulse));
-  
+  delayMicroseconds(x); // read AD0
+  digitalWrite(PWM, HIGH);
   delayMicroseconds(50);  //delay 50 uSec on output pulse to turn on triac
   digitalWrite(PWM, LOW);
-
-
-
-*/
-
 }
 //----------------------------------------7 Segment Init----------------------------------------
 void Segment_Init()
@@ -103,14 +91,14 @@ Vin_Battery= sum/10.0;
 void Segment_Timer_Update ()
 {
   
- noInterrupts();
+
  TCCR2=0; 
  TCCR2|= (1<<WGM21);   //choosing compare output mode for timer 2
  TCCR2|=(1<<CS22) | (1 <<CS21 ) | ( 1<< CS20) ;    //choosing 1024 prescalar so we can get 1 ms delay for updating Dipslay
  OCR2=10;
  TIMSK |= (1<<OCIE2);     //enabling interrupt
  TIMSK |= (1<<OCF2); 
- interrupts(); 
+
 }
  ISR(TIMER2_COMP_vect) 
  {
@@ -129,7 +117,7 @@ void Segment_Timer_Update ()
     sevseg.refreshDisplay(); 
     }
     if (ScreenTimer > 2000) ScreenTimer=0; 
-     
+    
   
  }
   //-----------------------------Write PWM----------------------------------------
@@ -162,7 +150,7 @@ if (PID_I > 2500) PID_I=2500;
 PID_Value=PID_P+PID_I ; 
 // to make range of pid 
 if (PID_Value <0) PID_Value=0;
-if (PID_Value > 2500) PID_Value=2500; 
+if (PID_Value > 5000) PID_Value=5000; 
 //analogWrite(PWM,PID_Value) ; 
 OCR1A=PID_Value;
 HeatingPower=map(PID_Value,0,2500,0,100); // map pid value 
@@ -180,7 +168,7 @@ void loop() {
   // put your main code here, to run repeatedly:
    Read_Battery();
    //PID_Compute();
-  y=analogRead(A3);
-  x=map(y,0,1023,0,10000); // 0 - 10ms 
-  
+   y=analogRead(A3);
+   x=map(y,0,1023,5000,0); // 0 - 10ms 
+
 }
