@@ -49,10 +49,14 @@ Serial.begin(9600);
 //-----------------------------------------Interrupt-------------------------------------------
 void AC_Control()
 {
+  
   delayMicroseconds(x); // read AD0
   digitalWrite(PWM, HIGH);
   delayMicroseconds(50);  //delay 50 uSec on output pulse to turn on triac
   digitalWrite(PWM, LOW);
+
+   //y=analogRead(A3);
+   //x=map(y,0,1023,5000,0); // 0 - 10ms 
 }
 //----------------------------------------7 Segment Init----------------------------------------
 void Segment_Init()
@@ -72,7 +76,6 @@ void Segment_Init()
 void Read_Battery()
 {
 float sum=0 , Battery[10];
-float ADC_PID=512;
 ADC_Value=analogRead(A3);
 
 Battery_Voltage=(ADC_Value *5.0)/1024.0;
@@ -95,18 +98,19 @@ void Segment_Timer_Update ()
  TCCR2=0; 
  TCCR2|= (1<<WGM21);   //choosing compare output mode for timer 2
  TCCR2|=(1<<CS22) | (1 <<CS21 ) | ( 1<< CS20) ;    //choosing 1024 prescalar so we can get 1 ms delay for updating Dipslay
- OCR2=10;
+ OCR2=20;
  TIMSK |= (1<<OCIE2);     //enabling interrupt
  TIMSK |= (1<<OCF2); 
 
 }
  ISR(TIMER2_COMP_vect) 
  {
+  
 
     TCNT2=0;    // very important 
     ScreenTimer++;
   
-   if (ScreenTimer> 0 && ScreenTimer < 1000)
+    if (ScreenTimer> 0 && ScreenTimer < 1000)
     {
     sevseg.setNumberF(Vin_Battery,1); // Displays '3.141'
     sevseg.refreshDisplay();
@@ -117,23 +121,10 @@ void Segment_Timer_Update ()
     sevseg.refreshDisplay(); 
     }
     if (ScreenTimer > 2000) ScreenTimer=0; 
-    
   
+
  }
-  //-----------------------------Write PWM----------------------------------------
-void PWM_Init()
-{
-TCCR1A=0;
-TCCR1B=0;
-TCCR1A |= (1<<COM1A1)  ; //clear OC1A/OC1B on Compare Match and set mode 14 
-TCCR1A |= (1 << WGM11);
-TCCR1B |= (1 << WGM12);
-TCCR1B |= (1 << WGM13);
-TCCR1B |= (1<<CS10) | (1<<CS11) ; // prescalar 64 
-ICR1=2500;
-}
-
-
+//---------------------------------------------------------------------------------
 void PID_Compute()
 {
  // calculate error 
@@ -163,14 +154,13 @@ void setup() {
 Segment_Init();
 GPIO_Init(); 
 Segment_Timer_Update();
-//PWM_Init(); 
+
 }
 //-> start developing
 void loop() {
   // put your main code here, to run repeatedly:
    Read_Battery();
    PID_Compute();
-   //y=analogRead(A3);
-   //x=map(y,0,1023,5000,0); // 0 - 10ms 
+  
 
 }
