@@ -88,6 +88,8 @@ void Segment_Init()
   bool disableDecPoint = false; // Use 'true' if your decimal point doesn't exist or isn't connected. Then, you only need to specify 7 segmentPins[]
   sevseg.begin(hardwareConfig, numDigits, digitPins, segmentPins, resistorsOnSegments,
   updateWithDelays, leadingZeros, disableDecPoint);
+  sevseg.setBrightness(100);
+  
   
 }
 //---------------------------------------Read Battery Voltage-----------------------------------
@@ -97,16 +99,14 @@ float sum=0 , Battery[10];
 ADC_Value=analogRead(A3);
 
 Battery_Voltage=(ADC_Value *5.0)/1024.0;
-/*
+
 for ( char i=0; i<10 ; i++)
 {
 Battery[i]=((10.5/0.5)*Battery_Voltage);
 delay(50);
 sum+=Battery[i];
 }
-*/
-
-Vin_Battery= ((10.5/0.5)*Battery_Voltage);
+Vin_Battery= sum/10.0;
 }
 //-------------------------------------Timer for updating screen reads--------------------------
 void Segment_Timer_Update ()
@@ -114,37 +114,33 @@ void Segment_Timer_Update ()
 
  TCCR2=0; 
  TCCR2|= (1<<WGM21);   //choosing compare output mode for timer 2
- TCCR2|=(1<<CS22) | (1 <<CS21 ) | ( 1<< CS20) ;    //choosing 1024 prescalar so we can get 1 ms delay for updating Dipslay
- OCR2=20;
+ TCCR2|= (1<<CS22) | (1 <<CS21 ) ;    //choosing 1024 prescalar so we can get 1 ms delay for updating Dipslay
  TIMSK |= (1<<OCIE2);     //enabling interrupt
+ OCR2=20;
  
 
 }
  ISR(TIMER2_COMP_vect) 
  {
   
+    
     TCNT2=0;    // very important 
-  
     ScreenTimer++;
    
-    if (ScreenTimer> 0 && ScreenTimer < 2000)
+    if (ScreenTimer> 0 && ScreenTimer < 5000)
     {
     sevseg.setNumberF(Vin_Battery,1); // Displays '3.141'
     sevseg.refreshDisplay();
+    
     }
-    if (ScreenTimer>2000 && ScreenTimer< 3000) 
+    if (ScreenTimer>5000 && ScreenTimer< 7000) 
     {
-    sevseg.setNumber(HeatingPower); // Displays '3.141'
-    sevseg.refreshDisplay();
+    sevseg.setNumber(HeatingPower); // Displays '3.141' 
+    sevseg.refreshDisplay(); 
     }
-    if (ScreenTimer>3000 && ScreenTimer< 4000) 
-    {
-    sevseg.setNumber(OCR1A); // Displays '3.141'
-    sevseg.refreshDisplay();
-    }
-  
-    if (ScreenTimer > 4000) ScreenTimer=0; 
- 
+    
+    if (ScreenTimer > 7000) ScreenTimer=0; 
+
  }
 //---------------------------------------------------------------------------------
 void PID_Compute()
@@ -192,6 +188,6 @@ void loop() {
   // put your main code here, to run repeatedly:
    Read_Battery();
    PID_Compute();
-   delay(50);
+ 
 
 }
