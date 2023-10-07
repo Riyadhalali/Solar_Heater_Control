@@ -24,7 +24,7 @@ double Setpoint=12.5, Input, Output; // set point is the desired value for heati
 double Kp=10, Ki=5,Kd=0;
 double highestPowerInverter=50;
 uint16_t ScreenTimer=0;
-float cutVoltage=25.0;
+float cutVoltage=9.0;
 double PID_Value,PID_P,PID_I,PID_Error;
 double HeatingPower=0;
 int x=0,y=0;
@@ -59,9 +59,15 @@ void AC_Control()
 */
 //y=analogRead(A3);
 //x=map(y,0,1023,5000,0); // 0 - 10ms 
-
+if (Vin_Battery>=cutVoltage)
+{
 TCCR1B=0x04; //start timer with divide by 256 input
 TCNT1=0;
+}
+else 
+{
+ TCCR1B=0x00 ; // stop the timer for no having any output 
+}
 
 }
 ISR(TIMER1_COMPA_vect)
@@ -146,7 +152,8 @@ void Segment_Timer_Update ()
 //---------------------------------------------------------------------------------
 void PID_Compute()
 {
-
+if(Vin_Battery>=cutVoltage)
+{
  // calculate error 
 PID_Error=Vin_Battery-Setpoint; 
  //calculate the p value 
@@ -165,7 +172,12 @@ if (PID_Value > 1000) PID_Value=1000;
 
 HeatingPower=map(PID_Value,0,1000,0,100); // map pid value 
 OCR1A=map(PID_Value,0,1000,270,1);
-
+}
+else 
+{
+  PID_Value=0; 
+  // we also can stop timer to make output zero but i have done it in interrupts 
+}
 }
 //-------------------------------------------Timer Init---------------------------------------
 void Timer_Init()
@@ -174,7 +186,11 @@ TCCR1A=0 ;  // zero timer
 TCCR1B=0;  // zero timer 
 TCCR1B |= (1<<WGM12); 
 TIMSK  |= (1 <<OCIE1A) | (1<< TOIE1) ;   // TIMER OVERFLOW AND INTERRUPT ENABLE 
- 
+}
+//--------------------------------------CheckForSetup------------------------------------------
+void CheckForSet()
+{
+
 }
 //*****************************************MAIN LOOP********************************************
 void setup() {
@@ -189,6 +205,8 @@ void loop() {
   // put your main code here, to run repeatedly:
    Read_Battery();
    PID_Compute();
+   CheckForSet();
+
    delay(100);
  
 
