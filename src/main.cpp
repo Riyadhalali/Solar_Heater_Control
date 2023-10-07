@@ -105,15 +105,15 @@ float sum=0 , Battery[10];
 ADC_Value=analogRead(A3);
 
 Battery_Voltage=(ADC_Value *5.0)/1024.0;
-/*
+
 for ( char i=0; i<10 ; i++)
 {
 Battery[i]=((10.5/0.5)*Battery_Voltage);
 delay(50);
 sum+=Battery[i];
 }
-*/
-Vin_Battery= ((10.5/0.5)*Battery_Voltage);
+
+Vin_Battery= sum/10.0;
 }
 //-------------------------------------Timer for updating screen reads--------------------------
 void Segment_Timer_Update ()
@@ -124,9 +124,7 @@ void Segment_Timer_Update ()
  TCCR2|= (1<<CS22) | (1 <<CS21 ) ;    //choosing 1024 prescalar so we can get 1 ms delay for updating Dipslay
  TIMSK |= (1<<OCIE2);     //enabling interrupt
  OCR2=20;
- 
-
-}
+ }
  ISR(TIMER2_COMP_vect) 
  {
   
