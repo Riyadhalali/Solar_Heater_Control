@@ -21,7 +21,7 @@ char txt[32];
 //Define Variables we'll be connecting to
 double Setpoint=12.5, Input, Output; // set point is the desired value for heating 
 //Specify the links and initial tuning parameters
-double Kp=1, Ki=1,Kd=0;
+double Kp=10, Ki=5,Kd=0;
 double highestPowerInverter=50;
 uint16_t ScreenTimer=0;
 float cutVoltage=25.0;
@@ -99,14 +99,15 @@ float sum=0 , Battery[10];
 ADC_Value=analogRead(A3);
 
 Battery_Voltage=(ADC_Value *5.0)/1024.0;
-
+/*
 for ( char i=0; i<10 ; i++)
 {
 Battery[i]=((10.5/0.5)*Battery_Voltage);
 delay(50);
 sum+=Battery[i];
 }
-Vin_Battery= sum/10.0;
+*/
+Vin_Battery= ((10.5/0.5)*Battery_Voltage);
 }
 //-------------------------------------Timer for updating screen reads--------------------------
 void Segment_Timer_Update ()
@@ -145,6 +146,7 @@ void Segment_Timer_Update ()
 //---------------------------------------------------------------------------------
 void PID_Compute()
 {
+
  // calculate error 
 PID_Error=Vin_Battery-Setpoint; 
  //calculate the p value 
@@ -162,8 +164,7 @@ if (PID_Value <0) PID_Value=0;
 if (PID_Value > 1000) PID_Value=1000; 
 
 HeatingPower=map(PID_Value,0,1000,0,100); // map pid value 
-OCR1A=map(PID_Value,0,1000,280,1);
-
+OCR1A=map(PID_Value,0,1000,270,1);
 
 }
 //-------------------------------------------Timer Init---------------------------------------
@@ -188,6 +189,7 @@ void loop() {
   // put your main code here, to run repeatedly:
    Read_Battery();
    PID_Compute();
+   delay(100);
  
 
 }
