@@ -1,3 +1,14 @@
+
+/*
+ref for phase control : https://playground.arduino.cc/Main/ACPhaseControl/
+
+
+
+
+
+
+
+*/
 #include <Arduino.h>
 #include "SevSeg.h"
 
@@ -94,7 +105,7 @@ void Segment_Init()
   bool disableDecPoint = false; // Use 'true' if your decimal point doesn't exist or isn't connected. Then, you only need to specify 7 segmentPins[]
   sevseg.begin(hardwareConfig, numDigits, digitPins, segmentPins, resistorsOnSegments,
   updateWithDelays, leadingZeros, disableDecPoint);
-  sevseg.setBrightness(100);
+  sevseg.setBrightness(0);
   
   
 }
@@ -123,7 +134,7 @@ void Segment_Timer_Update ()
  TCCR2|= (1<<WGM21);   //choosing compare output mode for timer 2
  TCCR2|= (1<<CS22) | (1 <<CS21 ) ;    //choosing 1024 prescalar so we can get 1 ms delay for updating Dipslay
  TIMSK |= (1<<OCIE2);     //enabling interrupt
- OCR2=20;
+ OCR2=40;
  }
  ISR(TIMER2_COMP_vect) 
  {
@@ -132,19 +143,19 @@ void Segment_Timer_Update ()
     TCNT2=0;    // very important 
     ScreenTimer++;
    
-    if (ScreenTimer> 0 && ScreenTimer < 5000)
+    if (ScreenTimer> 0 && ScreenTimer < 7000)
     {
     sevseg.setNumberF(Vin_Battery,1); // Displays '3.141'
     sevseg.refreshDisplay();
     
     }
-    if (ScreenTimer>5000 && ScreenTimer< 7000) 
+    if (ScreenTimer>7000 && ScreenTimer< 8000) 
     {
     sevseg.setNumber(HeatingPower); // Displays '3.141' 
     sevseg.refreshDisplay(); 
     }
     
-    if (ScreenTimer > 7000) ScreenTimer=0; 
+    if (ScreenTimer > 8000) ScreenTimer=0; 
 
  }
 //---------------------------------------------------------------------------------
@@ -201,10 +212,10 @@ Timer_Init();
 //-> start developing
 void loop() {
   // put your main code here, to run repeatedly:
+
    Read_Battery();
    PID_Compute();
    CheckForSet();
-
    delay(100);
  
 
