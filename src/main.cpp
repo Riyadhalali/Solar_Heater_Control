@@ -30,19 +30,21 @@ float Battery_Voltage=0,Vin_Battery=0;
 unsigned int  ADC_Value=0;  
 char txt[32];
 //Define Variables we'll be connecting to
-double Setpoint=12.5, Input, Output; // set point is the desired value for heating 
+double Setpoint=14.5, Input, Output; // set point is the desired value for heating 
 //Specify the links and initial tuning parameters
 double Kp=10, Ki=5,Kd=0;
 double highestPowerInverter=50;
 uint16_t ScreenTimer=0;
-float cutVoltage=9.0;
+float cutVoltage=12.5;
 double PID_Value,PID_P,PID_I,PID_Error;
 double HeatingPower=0;
 int x=0,y=0;
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
-
+void SetFloatVoltage() ; 
+void SetCutVoltage();
+void SetupProgram();
 
 
 //-------------------------------------------Functions---------------------------------------------- 
@@ -105,7 +107,7 @@ void Segment_Init()
   bool disableDecPoint = false; // Use 'true' if your decimal point doesn't exist or isn't connected. Then, you only need to specify 7 segmentPins[]
   sevseg.begin(hardwareConfig, numDigits, digitPins, segmentPins, resistorsOnSegments,
   updateWithDelays, leadingZeros, disableDecPoint);
-  sevseg.setBrightness(0);
+  sevseg.setBrightness(0);  // for clearing flockering in display 
   
   
 }
@@ -124,7 +126,7 @@ delay(50);
 sum+=Battery[i];
 }
 
-Vin_Battery= sum/10.0;
+Vin_Battery=sum/10.0;
 }
 //-------------------------------------Timer for updating screen reads--------------------------
 void Segment_Timer_Update ()
@@ -143,19 +145,19 @@ void Segment_Timer_Update ()
     TCNT2=0;    // very important 
     ScreenTimer++;
    
-    if (ScreenTimer> 0 && ScreenTimer < 7000)
+    if (ScreenTimer> 0 && ScreenTimer < 9000)
     {
     sevseg.setNumberF(Vin_Battery,1); // Displays '3.141'
     sevseg.refreshDisplay();
     
     }
-    if (ScreenTimer>7000 && ScreenTimer< 8000) 
+    if (ScreenTimer>9000 && ScreenTimer< 11000) 
     {
     sevseg.setNumber(HeatingPower); // Displays '3.141' 
     sevseg.refreshDisplay(); 
     }
     
-    if (ScreenTimer > 8000) ScreenTimer=0; 
+    if (ScreenTimer > 11000) ScreenTimer=0; 
 
  }
 //---------------------------------------------------------------------------------
@@ -199,6 +201,64 @@ TIMSK  |= (1 <<OCIE1A) | (1<< TOIE1) ;   // TIMER OVERFLOW AND INTERRUPT ENABLE
 //--------------------------------------CheckForSetup------------------------------------------
 void CheckForSet()
 {
+  noInterrupts(); 
+
+if (digitalRead(Enter)==1) 
+{
+
+  delay(1000);
+  SetupProgram();
+}
+interrupts();
+}
+//----------------------------------------Setup Program------------------------------
+void SetupProgram()
+{
+  
+  while (digitalRead(Enter)==0) 
+  {
+   SetCutVoltage();
+   delay(500);
+ 
+  } 
+  
+
+}
+
+//----------------------------------------Set Cut Voltage--------------------------------------
+void SetCutVoltage()
+{
+delay(500);
+while (digitalRead(Enter)==0) 
+{
+sevseg.setChars("P00");
+sevseg.refreshDisplay();
+}
+
+while (digitalRead(Enter)==0)
+{
+sevseg.setNumberF(cutVoltage,1);
+sevseg.refreshDisplay();
+while (digitalRead(Up)==1 || digitalRead(Down)==1) 
+{
+sevseg.setNumberF(cutVoltage,1);
+sevseg.refreshDisplay();
+if (digitalRead(Up)==1) 
+{
+  delay(50);
+  cutVoltage+=0.1; 
+} 
+if (digitalRead(Down)==1) 
+{
+  delay(50);
+  cutVoltage-=0.1; 
+} 
+}
+}
+}
+//---------------------------------------Set Float Voltage------------------------------------
+void SetFloatVoltage()
+{
 
 }
 //*****************************************MAIN LOOP********************************************
@@ -216,7 +276,7 @@ void loop() {
    Read_Battery();
    PID_Compute();
    CheckForSet();
-   delay(100);
+   delay(200);
  
 
 }
