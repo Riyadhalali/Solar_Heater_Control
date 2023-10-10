@@ -21,6 +21,7 @@ SevSeg sevseg; //Instantiate a seven segment object
 #define Down 0
 #define PWM 9	
 #define PULSE 4  //trigger pulse width (counts)
+#define LED 10
 
 
 //----------------------------------------Variables-------------------------------------------------
@@ -39,6 +40,10 @@ float cutVoltage=12.5;
 double PID_Value,PID_P,PID_I,PID_Error;
 double HeatingPower=0;
 int x=0,y=0;
+char SetupProgramNumber=0;
+char insideSetup=0;
+
+
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
@@ -57,6 +62,7 @@ pinMode(Up,INPUT);
 pinMode(Down,INPUT);
 pinMode(PWM,OUTPUT);
 pinMode(A3,INPUT);  // battery voltage reading 
+pinMode(LED,OUTPUT); 
 attachInterrupt(digitalPinToInterrupt(2),AC_Control,FALLING);
 
 }
@@ -80,6 +86,7 @@ TCNT1=0;
 else 
 {
  TCCR1B=0x00 ; // stop the timer for no having any output 
+ PID_Value=0; 
 }
 
 }
@@ -119,12 +126,12 @@ ADC_Value=analogRead(A3);
 
 Battery_Voltage=(ADC_Value *5.0)/1024.0;
 
-for ( char i=0; i<10 ; i++)
+ for ( char i=0; i<10 ; i++)
 {
 Battery[i]=((10.5/0.5)*Battery_Voltage);
 delay(50);
 sum+=Battery[i];
-}
+} 
 
 Vin_Battery=sum/10.0;
 }
@@ -145,17 +152,18 @@ void Segment_Timer_Update ()
     TCNT2=0;    // very important 
     ScreenTimer++;
    
-    if (ScreenTimer> 0 && ScreenTimer < 9000)
+    if (ScreenTimer> 0 && ScreenTimer < 9000 && insideSetup==0)
     {
     sevseg.setNumberF(Vin_Battery,1); // Displays '3.141'
     sevseg.refreshDisplay();
     
     }
-    if (ScreenTimer>9000 && ScreenTimer< 11000) 
+    if (ScreenTimer>9000 && ScreenTimer< 11000 && insideSetup==0) 
     {
     sevseg.setNumber(HeatingPower); // Displays '3.141' 
     sevseg.refreshDisplay(); 
     }
+   
     
     if (ScreenTimer > 11000) ScreenTimer=0; 
 
@@ -170,19 +178,19 @@ PID_Error=Vin_Battery-Setpoint;
  //calculate the p value 
 PID_P=Kp*PID_Error; 
 if (PID_P <0) PID_P=0;
-if (PID_P > 1000) PID_P=1000; 
+if (PID_P > 260) PID_P=260; 
 // calculate the I controller 
 PID_I=PID_I+ (Ki*PID_Error);
 if (PID_I <0) PID_I=0;
-if (PID_I > 1000) PID_I=1000; 
+if (PID_I > 260) PID_I=260; 
 // calcaulte the pid value final 
 PID_Value=PID_P+PID_I ; 
 // to make range of pid 
 if (PID_Value <0) PID_Value=0;
-if (PID_Value > 1000) PID_Value=1000; 
+if (PID_Value > 260) PID_Value=260; 
 
-HeatingPower=map(PID_Value,0,1000,0,100); // map pid value 
-OCR1A=map(PID_Value,0,1000,270,1);
+HeatingPower=map(PID_Value,0,260,0,100); // map pid value 
+OCR1A=map(PID_Value,0,260,260,1);
 }
 else 
 {
@@ -201,27 +209,29 @@ TIMSK  |= (1 <<OCIE1A) | (1<< TOIE1) ;   // TIMER OVERFLOW AND INTERRUPT ENABLE
 //--------------------------------------CheckForSetup------------------------------------------
 void CheckForSet()
 {
-  noInterrupts(); 
 
-if (digitalRead(Enter)==1) 
-{
+  
+  if (digitalRead(Enter)==1)
+  {
+    insideSetup=1;
+    delay(100);
+    SetupProgram() ; 
+  }
 
-  delay(1000);
-  SetupProgram();
-}
-interrupts();
+
 }
 //----------------------------------------Setup Program------------------------------
 void SetupProgram()
 {
-  
-  while (digitalRead(Enter)==0) 
-  {
-   SetCutVoltage();
-   delay(500);
- 
-  } 
-  
+while (digitalRead(Enter)==1)
+{
+    SetCutVoltage(); 
+    delay(500); 
+    SetFloatVoltage(); 
+    delay(500);
+   // break;
+}
+insideSetup=0;
 
 }
 
@@ -229,34 +239,38 @@ void SetupProgram()
 void SetCutVoltage()
 {
 delay(500);
-while (digitalRead(Enter)==0) 
+while(digitalRead(Enter)==0)
 {
-sevseg.setChars("P00");
-sevseg.refreshDisplay();
-}
-
+ sevseg.setNumberF(cutVoltage,1); 
+ sevseg.refreshDisplay(); 
+} 
+delay(500);
 while (digitalRead(Enter)==0)
 {
-sevseg.setNumberF(cutVoltage,1);
-sevseg.refreshDisplay();
+sevseg.setNumberF(cutVoltage,1); 
+sevseg.refreshDisplay(); 
 while (digitalRead(Up)==1 || digitalRead(Down)==1) 
 {
-sevseg.setNumberF(cutVoltage,1);
-sevseg.refreshDisplay();
-if (digitalRead(Up)==1) 
-{
-  delay(50);
-  cutVoltage+=0.1; 
-} 
-if (digitalRead(Down)==1) 
-{
-  delay(50);
-  cutVoltage-=0.1; 
-} 
+
+  sevseg.setNumberF(cutVoltage,1); 
+ sevseg.refreshDisplay();
+
+ if (digitalRead(Up)==1) 
+ {
+  delay(150);
+  cutVoltage+=0.1;
+
+ }
+  if (digitalRead(Down)==1) 
+ {
+  delay(150);
+  cutVoltage-=0.1;
+   }
+} // end while up and down
 }
+
 }
-}
-//---------------------------------------Set Float Voltage------------------------------------
+//---------------------------------------Set Float Vooltage----------------------------------
 void SetFloatVoltage()
 {
 
@@ -272,11 +286,12 @@ Timer_Init();
 //-> start developing
 void loop() {
   // put your main code here, to run repeatedly:
-
+   CheckForSet();
    Read_Battery();
    PID_Compute();
-   CheckForSet();
    delay(200);
+
+
  
 
 }
