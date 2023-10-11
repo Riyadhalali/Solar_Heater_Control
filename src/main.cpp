@@ -1,8 +1,8 @@
 
 /*
 ref for phase control : https://playground.arduino.cc/Main/ACPhaseControl/
-
-
+set point is the float voltage for system and must be made 
+- max vaLue for pwm is 260 and this value is tested 
 
 
 
@@ -11,6 +11,7 @@ ref for phase control : https://playground.arduino.cc/Main/ACPhaseControl/
 */
 #include <Arduino.h>
 #include "SevSeg.h"
+#include <EEPROM.h>
 
 //--------------------------------------Special Defines---------------------------------------------
 SevSeg sevseg; //Instantiate a seven segment object
@@ -31,7 +32,8 @@ float Battery_Voltage=0,Vin_Battery=0;
 unsigned int  ADC_Value=0;  
 char txt[32];
 //Define Variables we'll be connecting to
-double Setpoint=14.5, Input, Output; // set point is the desired value for heating 
+double Setpoint, Input, Output; // set point is the desired value for heating 
+
 //Specify the links and initial tuning parameters
 double Kp=10, Ki=5,Kd=0;
 double highestPowerInverter=50;
@@ -42,6 +44,9 @@ double HeatingPower=0;
 int x=0,y=0;
 char SetupProgramNumber=0;
 char insideSetup=0;
+char SolarMaxPower=0; 
+char GridMaxPower=0; 
+char PID_MaxHeatingValue;
 
 
 //--------------------------------------Functions Declartion---------------------------------------
@@ -50,6 +55,9 @@ void AC_Control();
 void SetFloatVoltage() ; 
 void SetCutVoltage();
 void SetupProgram();
+void EEPROM_Load();
+void SetSolarMaxPower();
+void CheckForParams();
 
 
 //-------------------------------------------Functions---------------------------------------------- 
@@ -171,6 +179,7 @@ void Segment_Timer_Update ()
 //---------------------------------------------------------------------------------
 void PID_Compute()
 {
+  //-> for solar heating power 
 if(Vin_Battery>=cutVoltage)
 {
  // calculate error 
@@ -178,19 +187,19 @@ PID_Error=Vin_Battery-Setpoint;
  //calculate the p value 
 PID_P=Kp*PID_Error; 
 if (PID_P <0) PID_P=0;
-if (PID_P > 260) PID_P=260; 
+if (PID_P > PID_MaxHeatingValue) PID_P=PID_MaxHeatingValue; 
 // calculate the I controller 
 PID_I=PID_I+ (Ki*PID_Error);
 if (PID_I <0) PID_I=0;
-if (PID_I > 260) PID_I=260; 
+if (PID_I > PID_MaxHeatingValue) PID_I=PID_MaxHeatingValue; 
 // calcaulte the pid value final 
 PID_Value=PID_P+PID_I ; 
 // to make range of pid 
 if (PID_Value <0) PID_Value=0;
-if (PID_Value > 260) PID_Value=260; 
+if (PID_Value > PID_MaxHeatingValue) PID_Value=PID_MaxHeatingValue; 
 
-HeatingPower=map(PID_Value,0,260,0,100); // map pid value 
-OCR1A=map(PID_Value,0,260,260,1);
+HeatingPower=map(PID_Value,0,260,0,100); // map pid value show the range between 1- 260 what is the power 
+OCR1A=map(PID_Value,0,PID_MaxHeatingValue,PID_MaxHeatingValue,1); // minus value of pwm is 1 and max value is 260 
 }
 else 
 {
@@ -229,7 +238,9 @@ while (digitalRead(Enter)==1)
     delay(500); 
     SetFloatVoltage(); 
     delay(500);
-   // break;
+    SetSolarMaxPower();
+    delay(500);
+    break;
 }
 insideSetup=0;
 
@@ -241,7 +252,7 @@ void SetCutVoltage()
 delay(500);
 while(digitalRead(Enter)==0)
 {
- sevseg.setNumberF(cutVoltage,1); 
+ sevseg.setChars("P01"); 
  sevseg.refreshDisplay(); 
 } 
 delay(500);
@@ -252,27 +263,138 @@ sevseg.refreshDisplay();
 while (digitalRead(Up)==1 || digitalRead(Down)==1) 
 {
 
-  sevseg.setNumberF(cutVoltage,1); 
+ sevseg.setNumberF(cutVoltage,1); 
  sevseg.refreshDisplay();
 
  if (digitalRead(Up)==1) 
  {
-  delay(150);
+  delay(100);
   cutVoltage+=0.1;
 
  }
   if (digitalRead(Down)==1) 
  {
-  delay(150);
+  delay(100);
   cutVoltage-=0.1;
    }
 } // end while up and down
-}
-
+}  // end main while 
+EEPROM.put(0,cutVoltage);
 }
 //---------------------------------------Set Float Vooltage----------------------------------
 void SetFloatVoltage()
 {
+delay(500);
+while(digitalRead(Enter)==0)
+{
+ sevseg.setChars("P02"); 
+ sevseg.refreshDisplay(); 
+} 
+delay(500);
+while (digitalRead(Enter)==0)
+{
+sevseg.setNumberF(Setpoint,1); 
+sevseg.refreshDisplay(); 
+while (digitalRead(Up)==1 || digitalRead(Down)==1) 
+{
+
+ sevseg.setNumberF(Setpoint,1); 
+ sevseg.refreshDisplay();
+
+ if (digitalRead(Up)==1) 
+ {
+  delay(100);
+  Setpoint+=0.1;
+
+ }
+  if (digitalRead(Down)==1) 
+ {
+  delay(100);
+  Setpoint-=0.1;
+   }
+} // end while up and down
+}  // end main while 
+EEPROM.put(4,Setpoint);
+}
+//------------------------------------------Set Solar Max Power----------------------------------
+void SetSolarMaxPower()
+{
+ delay(500);
+while(digitalRead(Enter)==0)
+{
+ sevseg.setChars("P03"); 
+ sevseg.refreshDisplay(); 
+} 
+delay(500);
+while (digitalRead(Enter)==0)
+{
+sevseg.setNumber(SolarMaxPower); 
+sevseg.refreshDisplay(); 
+while (digitalRead(Up)==1 || digitalRead(Down)==1) 
+{
+
+ sevseg.setNumberF(SolarMaxPower,1); 
+ sevseg.refreshDisplay();
+
+ if (digitalRead(Up)==1) 
+ {
+  delay(100);
+  SolarMaxPower++;
+
+ }
+  if (digitalRead(Down)==1) 
+ {
+  delay(100);
+  SolarMaxPower++;
+   }
+  if (SolarMaxPower>100)  SolarMaxPower=0;
+  if (SolarMaxPower<0) SolarMaxPower=0;
+} // end while up and down
+}  // end main while 
+PID_MaxHeatingValue=map(SolarMaxPower,0,100,0,260);
+EEPROM.write(8,SolarMaxPower); 
+EEPROM.write(9,PID_MaxHeatingValue); // for solar this value 
+
+}
+//-----------------------------------------EEPROM Load------------------------------------------
+void EEPROM_Load()
+{
+EEPROM.get(0,cutVoltage);
+EEPROM.get(4,Setpoint); 
+SolarMaxPower=EEPROM.read(8); 
+PID_MaxHeatingValue=EEPROM.read(9);
+
+
+}
+//---------------------------------------CheckForParams-----------------------------------------
+void CheckForParams()
+{
+if (cutVoltage<0 || cutVoltage>70 || isnan(cutVoltage) ) 
+{
+  cutVoltage=0;
+  EEPROM.put(0,cutVoltage); 
+  EEPROM_Load();
+}
+
+if (Setpoint<0 || Setpoint>70 || isnan(Setpoint) ) 
+{
+  Setpoint=0;
+  EEPROM.put(4,Setpoint); 
+  EEPROM_Load();
+}
+
+if (SolarMaxPower<0 || Setpoint>100) 
+{
+  SolarMaxPower=0;
+  EEPROM.put(8,SolarMaxPower); 
+  EEPROM_Load();
+}
+if (PID_MaxHeatingValue<0 || PID_MaxHeatingValue>260) 
+{
+  PID_MaxHeatingValue=0;
+  EEPROM.put(9,PID_MaxHeatingValue); 
+  EEPROM_Load();
+}
 
 }
 //*****************************************MAIN LOOP********************************************
@@ -281,11 +403,14 @@ void setup() {
 Segment_Init();
 Segment_Timer_Update();
 GPIO_Init();  
+EEPROM_Load();
 Timer_Init(); 
+
 }
 //-> start developing
 void loop() {
   // put your main code here, to run repeatedly:
+   CheckForParams();
    CheckForSet();
    Read_Battery();
    PID_Compute();
