@@ -46,7 +46,8 @@ char SetupProgramNumber=0;
 char insideSetup=0;
 char SolarMaxPower=0; 
 char GridMaxPower=0; 
-char PID_MaxHeatingValue;
+float PID_MaxHeatingValue;
+
 
 
 //--------------------------------------Functions Declartion---------------------------------------
@@ -160,20 +161,44 @@ void Segment_Timer_Update ()
     TCNT2=0;    // very important 
     ScreenTimer++;
    
-    if (ScreenTimer> 0 && ScreenTimer < 9000 && insideSetup==0)
+    if (ScreenTimer> 0 && ScreenTimer < 9000 && insideSetup==0 && SetupProgramNumber==0)
     {
     sevseg.setNumberF(Vin_Battery,1); // Displays '3.141'
     sevseg.refreshDisplay();
     
     }
-    if (ScreenTimer>9000 && ScreenTimer< 11000 && insideSetup==0) 
+    if (ScreenTimer>9000 && ScreenTimer< 11000 && insideSetup==0 && SetupProgramNumber==0) 
     {
     sevseg.setNumber(HeatingPower); // Displays '3.141' 
     sevseg.refreshDisplay(); 
     }
+
+    if (ScreenTimer>11000 && ScreenTimer< 12000 && insideSetup==0 && SetupProgramNumber==0) 
+    {
+    sevseg.setNumber(SolarMaxPower); // Displays '3.141' 
+    sevseg.refreshDisplay(); 
+    }
+
+    
+
+/*     if (SetupProgramNumber==1) 
+    {
+    sevseg.setNumberF(cutVoltage,1); // Displays '3.141' 
+    sevseg.refreshDisplay();  
+    }
+    if (SetupProgramNumber==2) 
+    {
+    sevseg.setNumberF(Setpoint,1); // Displays '3.141' 
+    sevseg.refreshDisplay();  
+    }
+    if (SetupProgramNumber==3) 
+    {
+    sevseg.setNumber(SolarMaxPower); // Displays '3.141' 
+    sevseg.refreshDisplay();  
+    } */
    
     
-    if (ScreenTimer > 11000) ScreenTimer=0; 
+    if (ScreenTimer > 12000) ScreenTimer=0; 
 
  }
 //---------------------------------------------------------------------------------
@@ -198,8 +223,9 @@ PID_Value=PID_P+PID_I ;
 if (PID_Value <0) PID_Value=0;
 if (PID_Value > PID_MaxHeatingValue) PID_Value=PID_MaxHeatingValue; 
 
-HeatingPower=map(PID_Value,0,260,0,100); // map pid value show the range between 1- 260 what is the power 
-OCR1A=map(PID_Value,0,PID_MaxHeatingValue,PID_MaxHeatingValue,1); // minus value of pwm is 1 and max value is 260 
+HeatingPower=map(PID_Value,0,PID_MaxHeatingValue,0,SolarMaxPower); // map pid value show the range between 1- 260 what is the power 
+OCR1A=map(PID_Value,0,PID_MaxHeatingValue,1,PID_MaxHeatingValue); // minus value of pwm is 1 and max value is 260 
+
 }
 else 
 {
@@ -222,8 +248,9 @@ void CheckForSet()
   
   if (digitalRead(Enter)==1)
   {
-    insideSetup=1;
+    
     delay(100);
+    insideSetup=1;
     SetupProgram() ; 
   }
 
@@ -243,6 +270,7 @@ while (digitalRead(Enter)==1)
     break;
 }
 insideSetup=0;
+SetupProgramNumber=0;
 
 }
 
@@ -256,6 +284,7 @@ while(digitalRead(Enter)==0)
  sevseg.refreshDisplay(); 
 } 
 delay(500);
+SetupProgramNumber=1 ; 
 while (digitalRead(Enter)==0)
 {
 sevseg.setNumberF(cutVoltage,1); 
@@ -290,6 +319,7 @@ while(digitalRead(Enter)==0)
  sevseg.setChars("P02"); 
  sevseg.refreshDisplay(); 
 } 
+SetupProgramNumber=2 ; 
 delay(500);
 while (digitalRead(Enter)==0)
 {
@@ -326,6 +356,7 @@ while(digitalRead(Enter)==0)
  sevseg.refreshDisplay(); 
 } 
 delay(500);
+SetupProgramNumber=3 ; 
 while (digitalRead(Enter)==0)
 {
 sevseg.setNumber(SolarMaxPower); 
@@ -333,7 +364,7 @@ sevseg.refreshDisplay();
 while (digitalRead(Up)==1 || digitalRead(Down)==1) 
 {
 
- sevseg.setNumberF(SolarMaxPower,1); 
+ sevseg.setNumber(SolarMaxPower); 
  sevseg.refreshDisplay();
 
  if (digitalRead(Up)==1) 
@@ -345,15 +376,17 @@ while (digitalRead(Up)==1 || digitalRead(Down)==1)
   if (digitalRead(Down)==1) 
  {
   delay(100);
-  SolarMaxPower++;
+  SolarMaxPower--;
    }
   if (SolarMaxPower>100)  SolarMaxPower=0;
   if (SolarMaxPower<0) SolarMaxPower=0;
 } // end while up and down
 }  // end main while 
-PID_MaxHeatingValue=map(SolarMaxPower,0,100,0,260);
+SolarMaxPower=SolarMaxPower; 
+PID_MaxHeatingValue=2.6*(100-SolarMaxPower); // because when we put 10 the power is 90 so i must reverse the way 
 EEPROM.write(8,SolarMaxPower); 
 EEPROM.write(9,PID_MaxHeatingValue); // for solar this value 
+insideSetup=0;
 
 }
 //-----------------------------------------EEPROM Load------------------------------------------
@@ -361,8 +394,12 @@ void EEPROM_Load()
 {
 EEPROM.get(0,cutVoltage);
 EEPROM.get(4,Setpoint); 
-SolarMaxPower=EEPROM.read(8); 
-PID_MaxHeatingValue=EEPROM.read(9);
+SolarMaxPower=EEPROM.read(8);
+PID_MaxHeatingValue=2.6*(100-SolarMaxPower);  // to always keep calculating the equation 
+//PID_MaxHeatingValue=EEPROM.read(9);
+/* SolarMaxPower=80;
+SolarMaxPower=100-SolarMaxPower;
+PID_MaxHeatingValue=2.6*SolarMaxPower; */
 
 
 }
@@ -371,25 +408,25 @@ void CheckForParams()
 {
 if (cutVoltage<0 || cutVoltage>70 || isnan(cutVoltage) ) 
 {
-  cutVoltage=0;
+  cutVoltage=12.5;
   EEPROM.put(0,cutVoltage); 
   EEPROM_Load();
 }
 
 if (Setpoint<0 || Setpoint>70 || isnan(Setpoint) ) 
 {
-  Setpoint=0;
+  Setpoint=14.5;
   EEPROM.put(4,Setpoint); 
   EEPROM_Load();
 }
 
-if (SolarMaxPower<0 || Setpoint>100) 
+if (SolarMaxPower<0 || Setpoint>100 || isnan(SolarMaxPower)) 
 {
-  SolarMaxPower=0;
+  SolarMaxPower=50;
   EEPROM.put(8,SolarMaxPower); 
   EEPROM_Load();
 }
-if (PID_MaxHeatingValue<0 || PID_MaxHeatingValue>260) 
+if (PID_MaxHeatingValue<0 || PID_MaxHeatingValue>=260 || isnan(PID_MaxHeatingValue)) 
 {
   PID_MaxHeatingValue=0;
   EEPROM.put(9,PID_MaxHeatingValue); 
@@ -415,8 +452,4 @@ void loop() {
    Read_Battery();
    PID_Compute();
    delay(200);
-
-
- 
-
 }
