@@ -4,17 +4,15 @@ ref for phase control : https://playground.arduino.cc/Main/ACPhaseControl/
 set point is the float voltage for system and must be made 
 - max vaLue for pwm is 260 and this value is tested 
 
-
-
-
-
 */
 #include <Arduino.h>
 #include "SevSeg.h"
 #include <EEPROM.h>
+#include <OneButton.h>
 
 //--------------------------------------Special Defines---------------------------------------------
 SevSeg sevseg; //Instantiate a seven segment object
+
 #define AC_Available_Grid 7
 #define AC_Available_Inverter 2
 #define Enter A5
@@ -23,8 +21,13 @@ SevSeg sevseg; //Instantiate a seven segment object
 #define PWM 9	
 #define PULSE 4  //trigger pulse width (counts)
 #define LED 10
+#define OCR1A_MaxValue 255
 
-
+OneButton btn = OneButton(
+  Enter,  // Input pin for the button
+  false,       // Button is active high
+  false        // Disable internal pull-up resistor
+);
 //----------------------------------------Variables-------------------------------------------------
 byte A=A1,B=12,C=5,D=3,E=8,F=A0,G=6,H=4;   // define pins 
 byte Display_1=A2,Display_2=11,Display_3=13; // define display ports control 
@@ -35,7 +38,7 @@ char txt[32];
 double Setpoint, Input, Output; // set point is the desired value for heating 
 
 //Specify the links and initial tuning parameters
-double Kp=10, Ki=5,Kd=0;
+double Kp=10,Ki=5,Kd=0;
 double highestPowerInverter=50;
 uint16_t ScreenTimer=0;
 float cutVoltage=12.5;
@@ -47,6 +50,8 @@ char insideSetup=0;
 char SolarMaxPower=0; 
 char GridMaxPower=0; 
 float PID_MaxHeatingValue;
+unsigned long lastTime; // for timing in PID controller 
+int SampleTime = 1000; //1 sec for sampling the PID 
 
 
 
@@ -59,8 +64,7 @@ void SetupProgram();
 void EEPROM_Load();
 void SetSolarMaxPower();
 void CheckForParams();
-
-
+void Press_Detect();
 //-------------------------------------------Functions---------------------------------------------- 
 void GPIO_Init()
 {
@@ -73,7 +77,8 @@ pinMode(PWM,OUTPUT);
 pinMode(A3,INPUT);  // battery voltage reading 
 pinMode(LED,OUTPUT); 
 attachInterrupt(digitalPinToInterrupt(2),AC_Control,FALLING);
-
+// Single Click event attachment
+btn.attachClick(Press_Detect);
 }
 
 //-----------------------------------------Interrupt-------------------------------------------
@@ -138,7 +143,7 @@ Battery_Voltage=(ADC_Value *5.0)/1024.0;
  for ( char i=0; i<10 ; i++)
 {
 Battery[i]=((10.5/0.5)*Battery_Voltage);
-delay(50);
+delay(10);
 sum+=Battery[i];
 } 
 
@@ -161,24 +166,19 @@ void Segment_Timer_Update ()
     TCNT2=0;    // very important 
     ScreenTimer++;
    
-    if (ScreenTimer> 0 && ScreenTimer < 9000 && insideSetup==0 && SetupProgramNumber==0)
+    if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0)
     {
     sevseg.setNumberF(Vin_Battery,1); // Displays '3.141'
     sevseg.refreshDisplay();
     
     }
-    if (ScreenTimer>9000 && ScreenTimer< 11000 && insideSetup==0 && SetupProgramNumber==0) 
+    if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0) 
     {
     sevseg.setNumber(HeatingPower); // Displays '3.141' 
     sevseg.refreshDisplay(); 
     }
 
-    if (ScreenTimer>11000 && ScreenTimer< 12000 && insideSetup==0 && SetupProgramNumber==0) 
-    {
-    sevseg.setNumber(SolarMaxPower); // Displays '3.141' 
-    sevseg.refreshDisplay(); 
-    }
-
+    
     
 
 /*     if (SetupProgramNumber==1) 
@@ -198,7 +198,7 @@ void Segment_Timer_Update ()
     } */
    
     
-    if (ScreenTimer > 12000) ScreenTimer=0; 
+    if (ScreenTimer > 7000) ScreenTimer=0; 
 
  }
 //---------------------------------------------------------------------------------
@@ -207,6 +207,11 @@ void PID_Compute()
   //-> for solar heating power 
 if(Vin_Battery>=cutVoltage)
 {
+  /*How long since we last calculated*/
+unsigned long now = millis();
+double timeChange = (double)(now - lastTime);
+if (timeChange >= SampleTime)
+  {
  // calculate error 
 PID_Error=Vin_Battery-Setpoint; 
  //calculate the p value 
@@ -224,12 +229,27 @@ if (PID_Value <0) PID_Value=0;
 if (PID_Value > PID_MaxHeatingValue) PID_Value=PID_MaxHeatingValue; 
 
 HeatingPower=map(PID_Value,0,PID_MaxHeatingValue,0,SolarMaxPower); // map pid value show the range between 1- 260 what is the power 
-OCR1A=map(PID_Value,0,PID_MaxHeatingValue,1,PID_MaxHeatingValue); // minus value of pwm is 1 and max value is 260 
-
+/*
+Calculation method:
+Solar Max Power : 40 % 
+PID_maxValue= 255 (OCR1A max value) - ( 2.5 (step) * Solar Max Power)
+OCR1A=map(PID_value(0-255),0,PID_maxValue,255,PID_maxValue+1 (+1 so OCR1A not become zero ever )) 
+OCR1A as testing can be 260 or lower because according to equation i need 10ms 
+Timer_count=  ( 10 MS * 10^-3 ) * ( 8*10^6 ) / 256 = 311
+AS FROM TESTING :
+best value was 260 or lower so load can be still on when the heating power is zero 
+ */
+OCR1A=map(PID_Value,0,PID_MaxHeatingValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260 
+lastTime=now;  // save last time 
+} // end if sample time 
 }
-else 
+else  if (Vin_Battery<= cutVoltage)
 {
   PID_Value=0; 
+  PID_I=0; 
+  PID_P=0;
+  HeatingPower=map(PID_Value,0,PID_MaxHeatingValue,0,SolarMaxPower);
+  OCR1A=map(PID_Value,0,PID_MaxHeatingValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260
   // we also can stop timer to make output zero but i have done it in interrupts 
 }
 }
@@ -250,8 +270,12 @@ void CheckForSet()
   {
     
     delay(100);
+    if (digitalRead(Enter)==1)
+    {
     insideSetup=1;
+    delay(1000);
     SetupProgram() ; 
+    }
   }
 
 
@@ -259,7 +283,8 @@ void CheckForSet()
 //----------------------------------------Setup Program------------------------------
 void SetupProgram()
 {
-while (digitalRead(Enter)==1)
+insideSetup=1;
+while (digitalRead(Enter)==0)
 {
     SetCutVoltage(); 
     delay(500); 
@@ -394,8 +419,8 @@ void EEPROM_Load()
 {
 EEPROM.get(0,cutVoltage);
 EEPROM.get(4,Setpoint); 
-SolarMaxPower=EEPROM.read(8);
-PID_MaxHeatingValue=2.6*(100-SolarMaxPower);  // to always keep calculating the equation 
+SolarMaxPower=40;
+PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 100 )
 //PID_MaxHeatingValue=EEPROM.read(9);
 /* SolarMaxPower=80;
 SolarMaxPower=100-SolarMaxPower;
@@ -434,6 +459,15 @@ if (PID_MaxHeatingValue<0 || PID_MaxHeatingValue>=260 || isnan(PID_MaxHeatingVal
 }
 
 }
+//-----------------------------------------PRESS DETECT-----------------------------------------
+void Press_Detect()
+{
+digitalWrite(LED,HIGH);
+
+SetupProgram();
+delay(500);
+digitalWrite(LED,LOW);
+}
 //*****************************************MAIN LOOP********************************************
 void setup() {
   // put your setup code here, to run once:
@@ -447,9 +481,11 @@ Timer_Init();
 //-> start developing
 void loop() {
   // put your main code here, to run repeatedly:
+   // keep watching the push button:
+   btn.tick();
    CheckForParams();
-   CheckForSet();
+  //  CheckForSet();
    Read_Battery();
-   PID_Compute();
-   delay(200);
+  // PID_Compute();
+   delay(10);
 }
