@@ -84,14 +84,6 @@ btn.attachClick(Press_Detect);
 //-----------------------------------------Interrupt-------------------------------------------
 void AC_Control()
 {
- 
- /*delayMicroseconds(x); // read AD0
- digitalWrite(PWM, HIGH);
- delayMicroseconds(50);  //delay 50 uSec on output pulse to turn on triac
- digitalWrite(PWM, LOW);
-*/
-//y=analogRead(A3);
-//x=map(y,0,1023,5000,0); // 0 - 10ms 
 if (Vin_Battery>=cutVoltage)
 {
 TCCR1B=0x04; //start timer with divide by 256 input
@@ -153,13 +145,14 @@ Vin_Battery=sum/10.0;
 void Segment_Timer_Update ()
 {
 
- TCCR2=0; 
- TCCR2|= (1<<WGM21);   //choosing compare output mode for timer 2
- TCCR2|= (1<<CS22) | (1 <<CS21 ) ;    //choosing 1024 prescalar so we can get 1 ms delay for updating Dipslay
- TIMSK |= (1<<OCIE2);     //enabling interrupt
- OCR2=40;
+ TCCR2B=0; 
+ TCCR2B|= (1<<WGM21);   //choosing compare output mode for timer 2
+ TCCR2B|= (1<<CS22) | (1 <<CS21 ) ;    //choosing 1024 prescalar so we can get 1 ms delay for updating Dipslay
+ TIMSK2 |= (1<<OCIE2A);     //enabling interrupt
+ OCR2A=40;
  }
- ISR(TIMER2_COMP_vect) 
+ 
+ ISR(TIMER2_COMPA_vect) 
  {
   
     
@@ -181,7 +174,7 @@ void Segment_Timer_Update ()
     
     
 
-/*     if (SetupProgramNumber==1) 
+    if (SetupProgramNumber==1) 
     {
     sevseg.setNumberF(cutVoltage,1); // Displays '3.141' 
     sevseg.refreshDisplay();  
@@ -195,9 +188,8 @@ void Segment_Timer_Update ()
     {
     sevseg.setNumber(SolarMaxPower); // Displays '3.141' 
     sevseg.refreshDisplay();  
-    } */
-   
-    
+    } 
+       
     if (ScreenTimer > 7000) ScreenTimer=0; 
 
  }
@@ -259,7 +251,7 @@ void Timer_Init()
 TCCR1A=0 ;  // zero timer 
 TCCR1B=0;  // zero timer 
 TCCR1B |= (1<<WGM12); 
-TIMSK  |= (1 <<OCIE1A) | (1<< TOIE1) ;   // TIMER OVERFLOW AND INTERRUPT ENABLE 
+TIMSK1  |= (1 <<OCIE1A) | (1<< TOIE1) ;   // TIMER OVERFLOW AND INTERRUPT ENABLE 
 }
 //--------------------------------------CheckForSetup------------------------------------------
 void CheckForSet()
@@ -302,24 +294,24 @@ SetupProgramNumber=0;
 //----------------------------------------Set Cut Voltage--------------------------------------
 void SetCutVoltage()
 {
-delay(500);
+delay(200);
 while(digitalRead(Enter)==0)
 {
  sevseg.setChars("P01"); 
  sevseg.refreshDisplay(); 
 } 
-delay(500);
+delay(200);
 SetupProgramNumber=1 ; 
 while (digitalRead(Enter)==0)
 {
-sevseg.setNumberF(cutVoltage,1); 
-sevseg.refreshDisplay(); 
+/* sevseg.setNumberF(cutVoltage,1); 
+sevseg.refreshDisplay();  */
 while (digitalRead(Up)==1 || digitalRead(Down)==1) 
 {
 
- sevseg.setNumberF(cutVoltage,1); 
+/*  sevseg.setNumberF(cutVoltage,1); 
  sevseg.refreshDisplay();
-
+ */
  if (digitalRead(Up)==1) 
  {
   delay(100);
@@ -338,27 +330,28 @@ EEPROM.put(0,cutVoltage);
 //---------------------------------------Set Float Vooltage----------------------------------
 void SetFloatVoltage()
 {
-delay(500);
+delay(200);
+SetupProgramNumber=0;
 while(digitalRead(Enter)==0)
 {
  sevseg.setChars("P02"); 
  sevseg.refreshDisplay(); 
 } 
 SetupProgramNumber=2 ; 
-delay(500);
+delay(200);
 while (digitalRead(Enter)==0)
 {
-sevseg.setNumberF(Setpoint,1); 
-sevseg.refreshDisplay(); 
+/* sevseg.setNumberF(Setpoint,1); 
+sevseg.refreshDisplay();  */
 while (digitalRead(Up)==1 || digitalRead(Down)==1) 
 {
 
- sevseg.setNumberF(Setpoint,1); 
- sevseg.refreshDisplay();
+/*  sevseg.setNumberF(Setpoint,1); 
+ sevseg.refreshDisplay(); */
 
  if (digitalRead(Up)==1) 
  {
-  delay(100);
+  delay(100); 
   Setpoint+=0.1;
 
  }
@@ -370,27 +363,29 @@ while (digitalRead(Up)==1 || digitalRead(Down)==1)
 } // end while up and down
 }  // end main while 
 EEPROM.put(4,Setpoint);
+
 }
 //------------------------------------------Set Solar Max Power----------------------------------
 void SetSolarMaxPower()
 {
- delay(500);
+ delay(200);
+ SetupProgramNumber=0;
 while(digitalRead(Enter)==0)
 {
  sevseg.setChars("P03"); 
  sevseg.refreshDisplay(); 
 } 
-delay(500);
+delay(200);
 SetupProgramNumber=3 ; 
 while (digitalRead(Enter)==0)
 {
-sevseg.setNumber(SolarMaxPower); 
-sevseg.refreshDisplay(); 
+/* sevseg.setNumber(SolarMaxPower); 
+sevseg.refreshDisplay();  */
 while (digitalRead(Up)==1 || digitalRead(Down)==1) 
 {
 
- sevseg.setNumber(SolarMaxPower); 
- sevseg.refreshDisplay();
+/*  sevseg.setNumber(SolarMaxPower); 
+ sevseg.refreshDisplay(); */
 
  if (digitalRead(Up)==1) 
  {
@@ -407,21 +402,20 @@ while (digitalRead(Up)==1 || digitalRead(Down)==1)
   if (SolarMaxPower<0) SolarMaxPower=0;
 } // end while up and down
 }  // end main while 
-SolarMaxPower=SolarMaxPower; 
-PID_MaxHeatingValue=2.6*(100-SolarMaxPower); // because when we put 10 the power is 90 so i must reverse the way 
+PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 100 )
 EEPROM.write(8,SolarMaxPower); 
 EEPROM.write(9,PID_MaxHeatingValue); // for solar this value 
-insideSetup=0;
-
 }
+
 //-----------------------------------------EEPROM Load------------------------------------------
 void EEPROM_Load()
 {
 EEPROM.get(0,cutVoltage);
 EEPROM.get(4,Setpoint); 
-SolarMaxPower=40;
-PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 100 )
-//PID_MaxHeatingValue=EEPROM.read(9);
+//SolarMaxPower=40;
+//PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 100 )
+SolarMaxPower=EEPROM.read(8);
+PID_MaxHeatingValue=EEPROM.read(9);
 /* SolarMaxPower=80;
 SolarMaxPower=100-SolarMaxPower;
 PID_MaxHeatingValue=2.6*SolarMaxPower; */
@@ -463,7 +457,6 @@ if (PID_MaxHeatingValue<0 || PID_MaxHeatingValue>=260 || isnan(PID_MaxHeatingVal
 void Press_Detect()
 {
 digitalWrite(LED,HIGH);
-
 SetupProgram();
 delay(500);
 digitalWrite(LED,LOW);
@@ -484,8 +477,7 @@ void loop() {
    // keep watching the push button:
    btn.tick();
    CheckForParams();
-  //  CheckForSet();
    Read_Battery();
-  // PID_Compute();
+   PID_Compute();
    delay(10);
 }
