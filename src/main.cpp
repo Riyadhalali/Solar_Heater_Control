@@ -65,6 +65,7 @@ void EEPROM_Load();
 void SetSolarMaxPower();
 void CheckForParams();
 void Press_Detect();
+void Sample_Timing();
 //-------------------------------------------Functions---------------------------------------------- 
 void GPIO_Init()
 {
@@ -189,6 +190,11 @@ void Segment_Timer_Update ()
     sevseg.setNumber(SolarMaxPower); // Displays '3.141' 
     sevseg.refreshDisplay();  
     } 
+    if (SetupProgramNumber==4) 
+    {
+    sevseg.setNumber(SampleTime); // Displays '3.141' 
+    sevseg.refreshDisplay();  
+    } 
        
     if (ScreenTimer > 7000) ScreenTimer=0; 
 
@@ -231,8 +237,9 @@ Timer_count=  ( 10 MS * 10^-3 ) * ( 8*10^6 ) / 256 = 311
 AS FROM TESTING :
 best value was 260 or lower so load can be still on when the heating power is zero 
  */
-OCR1A=map(PID_Value,0,PID_MaxHeatingValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260 
+OCR1A=map(PID_Value,0,PID_MaxHeatingValue,OCR1A_MaxValue,PID_MaxHeatingValue); // minus value of pwm is 1 and max value is 260 
 lastTime=now;  // save last time 
+
 } // end if sample time 
 }
 else  if (Vin_Battery<= cutVoltage)
@@ -283,6 +290,8 @@ while (digitalRead(Enter)==0)
     SetFloatVoltage(); 
     delay(500);
     SetSolarMaxPower();
+    delay(500);
+    Sample_Timing();
     delay(500);
     break;
 }
@@ -406,7 +415,34 @@ PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 10
 EEPROM.write(8,SolarMaxPower); 
 EEPROM.write(9,PID_MaxHeatingValue); // for solar this value 
 }
+//-----------------------------------------Sampling time-----------------------------------------
+void Sample_Timing()
+{
+ delay(200);
+ SetupProgramNumber=0;
+while(digitalRead(Enter)==0)
+{
+ sevseg.setChars("P04"); 
+ sevseg.refreshDisplay(); 
+}
+delay(200);
+SetupProgramNumber=4 ; 
+while (digitalRead(Up)==1 || digitalRead(Down)==1) 
+{
+if (digitalRead(Up)==1) 
+ {
+delay(100);
+SampleTime++;
 
+ }
+if (digitalRead(Down)==1) 
+{
+delay(100);
+SampleTime--;
+} 
+} 
+EEPROM.put(10,SampleTime); 
+}
 //-----------------------------------------EEPROM Load------------------------------------------
 void EEPROM_Load()
 {
@@ -415,7 +451,9 @@ EEPROM.get(4,Setpoint);
 //SolarMaxPower=40;
 //PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 100 )
 SolarMaxPower=EEPROM.read(8);
+//PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 100 )
 PID_MaxHeatingValue=EEPROM.read(9);
+//EEPROM.get(10,SampleTime); 
 /* SolarMaxPower=80;
 SolarMaxPower=100-SolarMaxPower;
 PID_MaxHeatingValue=2.6*SolarMaxPower; */
@@ -439,16 +477,22 @@ if (Setpoint<0 || Setpoint>70 || isnan(Setpoint) )
   EEPROM_Load();
 }
 
-if (SolarMaxPower<0 || Setpoint>100 || isnan(SolarMaxPower)) 
+if (SolarMaxPower<0 || SolarMaxPower>100 || isnan(SolarMaxPower)) 
 {
   SolarMaxPower=50;
   EEPROM.put(8,SolarMaxPower); 
   EEPROM_Load();
 }
-if (PID_MaxHeatingValue<0 || PID_MaxHeatingValue>=260 || isnan(PID_MaxHeatingValue)) 
+if (PID_MaxHeatingValue<0 || PID_MaxHeatingValue>=OCR1A_MaxValue || isnan(PID_MaxHeatingValue)) 
 {
   PID_MaxHeatingValue=0;
   EEPROM.put(9,PID_MaxHeatingValue); 
+  EEPROM_Load();
+}
+if (SampleTime<0 || SampleTime>15000 || isnan(SampleTime)) 
+{
+  //SampleTime=1000;
+  EEPROM.put(10,SampleTime); 
   EEPROM_Load();
 }
 
@@ -469,7 +513,6 @@ Segment_Timer_Update();
 GPIO_Init();  
 EEPROM_Load();
 Timer_Init(); 
-
 }
 //-> start developing
 void loop() {
