@@ -51,8 +51,8 @@ char SolarMaxPower=0;
 char GridMaxPower=0; 
 float PID_MaxHeatingValue;
 unsigned long lastTime; // for timing in PID controller 
-int SampleTime = 1000; //1 sec for sampling the PID 
-
+int SampleTimeInSeconds=0;
+int PWM_Value;
 
 
 //--------------------------------------Functions Declartion---------------------------------------
@@ -94,6 +94,13 @@ else
 {
  TCCR1B=0x00 ; // stop the timer for no having any output 
  PID_Value=0; 
+}
+
+if (PWM_Value>=255 )  TCCR1B=0x00 ; // stop the timer for no having any output 
+else if(PWM_Value<255 ) 
+{
+TCCR1B=0x04; //start timer with divide by 256 input
+OCR1A=PWM_Value;
 }
 
 }
@@ -171,6 +178,12 @@ void Segment_Timer_Update ()
     sevseg.setNumber(HeatingPower); // Displays '3.141' 
     sevseg.refreshDisplay(); 
     }
+    if (ScreenTimer>7000 && ScreenTimer< 8000 && insideSetup==0 && SetupProgramNumber==0) 
+    {
+    sevseg.setNumber(PWM_Value); // Displays '3.141' 
+    sevseg.refreshDisplay(); 
+    }
+
 
     
     
@@ -192,11 +205,11 @@ void Segment_Timer_Update ()
     } 
     if (SetupProgramNumber==4) 
     {
-    sevseg.setNumber(SampleTime); // Displays '3.141' 
+    sevseg.setNumber(SampleTimeInSeconds); // Displays '3.141' 
     sevseg.refreshDisplay();  
     } 
        
-    if (ScreenTimer > 7000) ScreenTimer=0; 
+    if (ScreenTimer > 8000) ScreenTimer=0; 
 
  }
 //---------------------------------------------------------------------------------
@@ -208,7 +221,7 @@ if(Vin_Battery>=cutVoltage)
   /*How long since we last calculated*/
 unsigned long now = millis();
 double timeChange = (double)(now - lastTime);
-if (timeChange >= SampleTime)
+if (timeChange >= SampleTimeInSeconds*1000)
   {
  // calculate error 
 PID_Error=Vin_Battery-Setpoint; 
@@ -237,9 +250,8 @@ Timer_count=  ( 10 MS * 10^-3 ) * ( 8*10^6 ) / 256 = 311
 AS FROM TESTING :
 best value was 260 or lower so load can be still on when the heating power is zero 
  */
-OCR1A=map(PID_Value,0,PID_MaxHeatingValue,OCR1A_MaxValue,PID_MaxHeatingValue); // minus value of pwm is 1 and max value is 260 
+PWM_Value=map(PID_Value,0,PID_MaxHeatingValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260 
 lastTime=now;  // save last time 
-
 } // end if sample time 
 }
 else  if (Vin_Battery<= cutVoltage)
@@ -427,21 +439,24 @@ while(digitalRead(Enter)==0)
 }
 delay(200);
 SetupProgramNumber=4 ; 
+while (digitalRead(Enter)==0) 
+{
 while (digitalRead(Up)==1 || digitalRead(Down)==1) 
 {
 if (digitalRead(Up)==1) 
  {
 delay(100);
-SampleTime++;
+SampleTimeInSeconds++;
 
  }
 if (digitalRead(Down)==1) 
 {
 delay(100);
-SampleTime--;
+SampleTimeInSeconds--;
 } 
-} 
-EEPROM.put(10,SampleTime); 
+} // end while up and down
+} // end main while 
+EEPROM.write(10,SampleTimeInSeconds); 
 }
 //-----------------------------------------EEPROM Load------------------------------------------
 void EEPROM_Load()
@@ -449,14 +464,11 @@ void EEPROM_Load()
 EEPROM.get(0,cutVoltage);
 EEPROM.get(4,Setpoint); 
 //SolarMaxPower=40;
-//PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 100 )
 SolarMaxPower=EEPROM.read(8);
 //PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 100 )
 PID_MaxHeatingValue=EEPROM.read(9);
-//EEPROM.get(10,SampleTime); 
-/* SolarMaxPower=80;
-SolarMaxPower=100-SolarMaxPower;
-PID_MaxHeatingValue=2.6*SolarMaxPower; */
+
+SampleTimeInSeconds=EEPROM.read(10);
 
 
 }
@@ -489,10 +501,10 @@ if (PID_MaxHeatingValue<0 || PID_MaxHeatingValue>=OCR1A_MaxValue || isnan(PID_Ma
   EEPROM.put(9,PID_MaxHeatingValue); 
   EEPROM_Load();
 }
-if (SampleTime<0 || SampleTime>15000 || isnan(SampleTime)) 
+if (SampleTimeInSeconds<0 || SampleTimeInSeconds>100 || isnan(SampleTimeInSeconds)) 
 {
-  //SampleTime=1000;
-  EEPROM.put(10,SampleTime); 
+  SampleTimeInSeconds=5;
+  EEPROM.write(10,SampleTimeInSeconds); 
   EEPROM_Load();
 }
 
