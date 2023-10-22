@@ -23,7 +23,7 @@ SevSeg sevseg; //Instantiate a seven segment object
 #define LED 10
 #define OCR1A_MaxValue 255
 
-OneButton btn = OneButton(
+OneButton button = OneButton(
   Enter,  // Input pin for the button
   false,       // Button is active high
   false        // Disable internal pull-up resistor
@@ -38,7 +38,7 @@ char txt[32];
 double Setpoint, Input, Output; // set point is the desired value for heating 
 
 //Specify the links and initial tuning parameters
-double Kp=10,Ki=5,Kd=0;
+double Kp=20,Ki=10,Kd=0;
 double highestPowerInverter=50;
 uint16_t ScreenTimer=0;
 float cutVoltage=12.5;
@@ -46,15 +46,19 @@ double PID_Value,PID_P,PID_I,PID_Error;
 double HeatingPower=0;
 int x=0,y=0;
 char SetupProgramNumber=0;
+char SetupProgramNumberVariables=0;  // this variable to display the variable of the program when entering program 
 char insideSetup=0;
-char SolarMaxPower=0; 
+char SolarMaxPower=0,UtilityMaxPower=0;
 char GridMaxPower=0; 
 float PID_MaxHeatingValue;
+float PID_MaxHeatingValueUtility;
 unsigned long lastTime; // for timing in PID controller 
-int SampleTime = 1000; //1 sec for sampling the PID 
-
-
-
+int SampleTimeInSeconds=0;
+int PWM_Value;
+unsigned long longPressTime = 500; // Duration of a long press in milliseconds
+boolean loopRunning = false; // Flag indicating whether the loop is running
+bool InProgramMode=false; 
+char LoadsAlreadySwitchOff=0;
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
@@ -65,6 +69,10 @@ void EEPROM_Load();
 void SetSolarMaxPower();
 void CheckForParams();
 void Press_Detect();
+void Sample_Timing();
+void longPress();
+void shortPress(); 
+void SetUtilityMaxPower();
 //-------------------------------------------Functions---------------------------------------------- 
 void GPIO_Init()
 {
@@ -78,7 +86,13 @@ pinMode(A3,INPUT);  // battery voltage reading
 pinMode(LED,OUTPUT); 
 attachInterrupt(digitalPinToInterrupt(2),AC_Control,FALLING);
 // Single Click event attachment
-btn.attachClick(Press_Detect);
+
+//button.attachClick(Press_Detect);
+//button.setLongPressIntervalMs(500);  // Duration to hold a button to trigger a long press.
+button.setLongPressIntervalMs(100);
+button.attachLongPressStart(Press_Detect); // Attach a function to the long press stop event
+
+
 }
 
 //-----------------------------------------Interrupt-------------------------------------------
@@ -93,6 +107,13 @@ else
 {
  TCCR1B=0x00 ; // stop the timer for no having any output 
  PID_Value=0; 
+}
+
+if (PWM_Value>=255 )  TCCR1B=0x00 ; // stop the timer for no having any output 
+else if(PWM_Value<255 ) 
+{
+TCCR1B=0x04; //start timer with divide by 256 input
+OCR1A=PWM_Value;
 }
 
 }
@@ -157,8 +178,8 @@ void Segment_Timer_Update ()
   
     
     TCNT2=0;    // very important 
+    
     ScreenTimer++;
-   
     if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0)
     {
     sevseg.setNumberF(Vin_Battery,1); // Displays '3.141'
@@ -169,28 +190,70 @@ void Segment_Timer_Update ()
     {
     sevseg.setNumber(HeatingPower); // Displays '3.141' 
     sevseg.refreshDisplay(); 
-    }
-
-    
-    
+    }  
+  
 
     if (SetupProgramNumber==1) 
     {
-    sevseg.setNumberF(cutVoltage,1); // Displays '3.141' 
-    sevseg.refreshDisplay();  
+    sevseg.setChars("P01"); 
+    sevseg.refreshDisplay(); 
+     
     }
     if (SetupProgramNumber==2) 
     {
-    sevseg.setNumberF(Setpoint,1); // Displays '3.141' 
-    sevseg.refreshDisplay();  
+    sevseg.setChars("P02"); 
+    sevseg.refreshDisplay(); 
+   
     }
     if (SetupProgramNumber==3) 
     {
-    sevseg.setNumber(SolarMaxPower); // Displays '3.141' 
-    sevseg.refreshDisplay();  
+    sevseg.setChars("P03"); 
+    sevseg.refreshDisplay(); 
     } 
-       
-    if (ScreenTimer > 7000) ScreenTimer=0; 
+    if (SetupProgramNumber==4) 
+    {
+    sevseg.setChars("P04"); 
+    sevseg.refreshDisplay(); 
+    } 
+      if (SetupProgramNumber==5) 
+    {
+    sevseg.setChars("P05"); 
+    sevseg.refreshDisplay(); 
+    } 
+
+
+    // displaying variables 
+    if (SetupProgramNumber==10)    
+    {
+    sevseg.setNumberF(cutVoltage,1);
+    sevseg.refreshDisplay(); 
+    } 
+    if (SetupProgramNumber==11)    
+    {
+    sevseg.setNumberF(Setpoint,1);
+    sevseg.refreshDisplay(); 
+    } 
+    if (SetupProgramNumber==12)    
+    {
+    sevseg.setNumberF(Setpoint,1);
+    sevseg.refreshDisplay(); 
+    } 
+    if (SetupProgramNumber==13)    
+    {
+    sevseg.setNumber(SolarMaxPower);
+    sevseg.refreshDisplay(); 
+    } 
+    if (SetupProgramNumber==14)    
+    {
+    sevseg.setNumber(SampleTimeInSeconds);
+    sevseg.refreshDisplay(); 
+    } 
+       if (SetupProgramNumber==15)    
+    {
+    sevseg.setNumber(UtilityMaxPower);
+    sevseg.refreshDisplay(); 
+    } 
+  if (ScreenTimer > 7000) ScreenTimer=0; 
 
  }
 //---------------------------------------------------------------------------------
@@ -202,8 +265,8 @@ if(Vin_Battery>=cutVoltage)
   /*How long since we last calculated*/
 unsigned long now = millis();
 double timeChange = (double)(now - lastTime);
-if (timeChange >= SampleTime)
-  {
+if (timeChange >= SampleTimeInSeconds*1000)
+{
  // calculate error 
 PID_Error=Vin_Battery-Setpoint; 
  //calculate the p value 
@@ -219,8 +282,6 @@ PID_Value=PID_P+PID_I ;
 // to make range of pid 
 if (PID_Value <0) PID_Value=0;
 if (PID_Value > PID_MaxHeatingValue) PID_Value=PID_MaxHeatingValue; 
-
-HeatingPower=map(PID_Value,0,PID_MaxHeatingValue,0,SolarMaxPower); // map pid value show the range between 1- 260 what is the power 
 /*
 Calculation method:
 Solar Max Power : 40 % 
@@ -231,7 +292,8 @@ Timer_count=  ( 10 MS * 10^-3 ) * ( 8*10^6 ) / 256 = 311
 AS FROM TESTING :
 best value was 260 or lower so load can be still on when the heating power is zero 
  */
-OCR1A=map(PID_Value,0,PID_MaxHeatingValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260 
+HeatingPower=map(PID_Value,0,PID_MaxHeatingValue,0,SolarMaxPower); // map pid value show the range between 1- 260 what is the power 
+PWM_Value=map(PID_Value,0,PID_MaxHeatingValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260 
 lastTime=now;  // save last time 
 } // end if sample time 
 }
@@ -253,174 +315,207 @@ TCCR1B=0;  // zero timer
 TCCR1B |= (1<<WGM12); 
 TIMSK1  |= (1 <<OCIE1A) | (1<< TOIE1) ;   // TIMER OVERFLOW AND INTERRUPT ENABLE 
 }
-//--------------------------------------CheckForSetup------------------------------------------
-void CheckForSet()
-{
 
-  
-  if (digitalRead(Enter)==1)
-  {
-    
-    delay(100);
-    if (digitalRead(Enter)==1)
-    {
-    insideSetup=1;
-    delay(1000);
-    SetupProgram() ; 
-    }
-  }
-
-
-}
 //----------------------------------------Setup Program------------------------------
 void SetupProgram()
 {
 insideSetup=1;
-while (digitalRead(Enter)==0)
-{
-    SetCutVoltage(); 
-    delay(500); 
-    SetFloatVoltage(); 
-    delay(500);
-    SetSolarMaxPower();
-    delay(500);
-    break;
-}
+SetupProgramNumber=1; 
+SetCutVoltage();
+delay(200);
+SetFloatVoltage();   // set point 
+delay(200);
+SetSolarMaxPower();
+delay(200);
+Sample_Timing();
+delay(200);
+SetUtilityMaxPower();
+delay(200);
+SetupProgramNumber=0; 
 insideSetup=0;
-SetupProgramNumber=0;
-
 }
 
 //----------------------------------------Set Cut Voltage--------------------------------------
 void SetCutVoltage()
 {
 delay(200);
-while(digitalRead(Enter)==0)
+while (digitalRead(Enter)==0 && InProgramMode==true) 
 {
- sevseg.setChars("P01"); 
- sevseg.refreshDisplay(); 
-} 
-delay(200);
-SetupProgramNumber=1 ; 
-while (digitalRead(Enter)==0)
-{
-/* sevseg.setNumberF(cutVoltage,1); 
-sevseg.refreshDisplay();  */
-while (digitalRead(Up)==1 || digitalRead(Down)==1) 
-{
-
-/*  sevseg.setNumberF(cutVoltage,1); 
- sevseg.refreshDisplay();
- */
- if (digitalRead(Up)==1) 
- {
-  delay(100);
-  cutVoltage+=0.1;
-
- }
-  if (digitalRead(Down)==1) 
- {
-  delay(100);
-  cutVoltage-=0.1;
-   }
-} // end while up and down
-}  // end main while 
-EEPROM.put(0,cutVoltage);
+  SetupProgramNumber=1; 
+  /* sevseg.setChars("P00"); 
+sevseg.refreshDisplay(); */
 }
+delay(200);
+while (digitalRead(Enter)==0 && InProgramMode==true)
+{
+  SetupProgramNumber=10;
+
+/* sevseg.setNumberF(cutVoltage,1);
+sevseg.refreshDisplay(); */
+while (digitalRead(Up)==1 || digitalRead(Down)==1)
+{
+if (digitalRead(Up)==1) 
+{
+delay(100);  
+cutVoltage+=0.1; 
+}
+if (digitalRead(Down)==1) 
+{
+delay(100);
+cutVoltage-=0.1;
+}
+} // end while up and down 
+}  // end while enter 
+EEPROM.put(0,cutVoltage);
+} // end function 
 //---------------------------------------Set Float Vooltage----------------------------------
 void SetFloatVoltage()
 {
 delay(200);
-SetupProgramNumber=0;
-while(digitalRead(Enter)==0)
+while (digitalRead(Enter)==0) 
 {
- sevseg.setChars("P02"); 
- sevseg.refreshDisplay(); 
-} 
-SetupProgramNumber=2 ; 
+  SetupProgramNumber=2;
+/* sevseg.setChars("P01"); 
+sevseg.refreshDisplay(); */
+}
 delay(200);
 while (digitalRead(Enter)==0)
 {
-/* sevseg.setNumberF(Setpoint,1); 
-sevseg.refreshDisplay();  */
-while (digitalRead(Up)==1 || digitalRead(Down)==1) 
+  SetupProgramNumber=12; 
+/* sevseg.setNumberF(Setpoint,1);
+sevseg.refreshDisplay(); */
+while (digitalRead(Up)==1 || digitalRead(Down)==1)
 {
-
-/*  sevseg.setNumberF(Setpoint,1); 
- sevseg.refreshDisplay(); */
-
- if (digitalRead(Up)==1) 
- {
-  delay(100); 
-  Setpoint+=0.1;
-
- }
-  if (digitalRead(Down)==1) 
- {
-  delay(100);
-  Setpoint-=0.1;
-   }
-} // end while up and down
-}  // end main while 
+if (digitalRead(Up)==1) 
+{
+delay(100);  
+Setpoint+=0.1; 
+}
+if (digitalRead(Down)==1) 
+{
+delay(100);
+Setpoint-=0.1;
+}
+} // end while up and down 
+}  // end while enter 
 EEPROM.put(4,Setpoint);
-
 }
 //------------------------------------------Set Solar Max Power----------------------------------
 void SetSolarMaxPower()
 {
- delay(200);
- SetupProgramNumber=0;
-while(digitalRead(Enter)==0)
-{
- sevseg.setChars("P03"); 
- sevseg.refreshDisplay(); 
-} 
 delay(200);
-SetupProgramNumber=3 ; 
-while (digitalRead(Enter)==0)
+while(digitalRead(Enter)==0 )
 {
+  SetupProgramNumber=3;
+/*  sevseg.setChars("P02"); 
+ sevseg.refreshDisplay(); */ 
+} 
+delay(200); 
+while (digitalRead(Enter)==0 )
+{
+  SetupProgramNumber=13;
 /* sevseg.setNumber(SolarMaxPower); 
 sevseg.refreshDisplay();  */
 while (digitalRead(Up)==1 || digitalRead(Down)==1) 
 {
-
-/*  sevseg.setNumber(SolarMaxPower); 
- sevseg.refreshDisplay(); */
-
- if (digitalRead(Up)==1) 
- {
-  delay(100);
-  SolarMaxPower++;
-
- }
-  if (digitalRead(Down)==1) 
- {
-  delay(100);
-  SolarMaxPower--;
-   }
-  if (SolarMaxPower>100)  SolarMaxPower=0;
-  if (SolarMaxPower<0) SolarMaxPower=0;
+if (digitalRead(Up)==1) 
+{
+delay(100);
+SolarMaxPower++;
+}
+if (digitalRead(Down)==1) 
+{
+delay(100);
+SolarMaxPower--;
+}
+if (SolarMaxPower>100)  SolarMaxPower=0;
+if (SolarMaxPower<0) SolarMaxPower=0;
 } // end while up and down
 }  // end main while 
 PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 100 )
 EEPROM.write(8,SolarMaxPower); 
 EEPROM.write(9,PID_MaxHeatingValue); // for solar this value 
 }
-
+//-----------------------------------------Sampling time-----------------------------------------
+void Sample_Timing()
+{
+delay(200);
+ while(digitalRead(Enter)==0)
+{
+  SetupProgramNumber=4;
+ /* sevseg.setChars("P03"); 
+ sevseg.refreshDisplay();  */
+}
+delay(200);
+while (digitalRead(Enter)==0) 
+{
+  SetupProgramNumber=14;
+/* sevseg.setNumber(SampleTimeInSeconds); 
+sevseg.refreshDisplay(); */
+while (digitalRead(Up)==1 || digitalRead(Down)==1) 
+{
+if (digitalRead(Up)==1) 
+ {
+delay(100);
+SampleTimeInSeconds++;
+}
+if (digitalRead(Down)==1) 
+{
+delay(100);
+SampleTimeInSeconds--;
+} 
+} // end while up and down
+} // end main while 
+EEPROM.write(10,SampleTimeInSeconds); 
+}
+//-----------------------------------------Set utility max power-------------------------------
+void SetUtilityMaxPower()
+{
+delay(200);
+while(digitalRead(Enter)==0 )
+{
+SetupProgramNumber=5;
+/*  sevseg.setChars("P02"); 
+ sevseg.refreshDisplay(); */ 
+} 
+delay(200); 
+while (digitalRead(Enter)==0 )
+{
+SetupProgramNumber=15;
+/* sevseg.setNumber(SolarMaxPower); 
+sevseg.refreshDisplay();  */
+while (digitalRead(Up)==1 || digitalRead(Down)==1) 
+{
+if (digitalRead(Up)==1) 
+{
+delay(100);
+UtilityMaxPower++;
+}
+if (digitalRead(Down)==1) 
+{
+delay(100);
+UtilityMaxPower--;
+}
+if (UtilityMaxPower>100)  UtilityMaxPower=0;
+if (UtilityMaxPower<0) UtilityMaxPower=0;
+} // end while up and down
+}  // end main while 
+PID_MaxHeatingValueUtility=OCR1A_MaxValue - ( 2.5 * UtilityMaxPower);  // (2.5 = 255 / 100 )
+EEPROM.write(11,UtilityMaxPower); 
+EEPROM.write(12,PID_MaxHeatingValueUtility); // for solar this value
+}
 //-----------------------------------------EEPROM Load------------------------------------------
 void EEPROM_Load()
 {
 EEPROM.get(0,cutVoltage);
 EEPROM.get(4,Setpoint); 
 //SolarMaxPower=40;
-//PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 100 )
 SolarMaxPower=EEPROM.read(8);
+//PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 100 )
 PID_MaxHeatingValue=EEPROM.read(9);
-/* SolarMaxPower=80;
-SolarMaxPower=100-SolarMaxPower;
-PID_MaxHeatingValue=2.6*SolarMaxPower; */
-
-
+SampleTimeInSeconds=EEPROM.read(10);
+UtilityMaxPower=EEPROM.read(11);
+PID_MaxHeatingValueUtility=EEPROM.read(12);
 }
 //---------------------------------------CheckForParams-----------------------------------------
 void CheckForParams()
@@ -439,16 +534,35 @@ if (Setpoint<0 || Setpoint>70 || isnan(Setpoint) )
   EEPROM_Load();
 }
 
-if (SolarMaxPower<0 || Setpoint>100 || isnan(SolarMaxPower)) 
+if (SolarMaxPower<0 || SolarMaxPower>100 || isnan(SolarMaxPower)) 
 {
   SolarMaxPower=50;
-  EEPROM.put(8,SolarMaxPower); 
+  EEPROM.write(8,SolarMaxPower); 
   EEPROM_Load();
 }
-if (PID_MaxHeatingValue<0 || PID_MaxHeatingValue>=260 || isnan(PID_MaxHeatingValue)) 
+if (PID_MaxHeatingValue<0 || PID_MaxHeatingValue>=OCR1A_MaxValue || isnan(PID_MaxHeatingValue)) 
 {
   PID_MaxHeatingValue=0;
-  EEPROM.put(9,PID_MaxHeatingValue); 
+  EEPROM.write(9,PID_MaxHeatingValue); 
+  EEPROM_Load();
+}
+if (SampleTimeInSeconds<0 || SampleTimeInSeconds>100 || isnan(SampleTimeInSeconds)) 
+{
+  SampleTimeInSeconds=5;
+  EEPROM.write(10,SampleTimeInSeconds); 
+  EEPROM_Load();
+}
+if (UtilityMaxPower<0 || UtilityMaxPower>100 || isnan(UtilityMaxPower)) 
+{
+  UtilityMaxPower=50;
+  EEPROM.write(11,UtilityMaxPower); 
+  EEPROM_Load();
+}
+
+if (PID_MaxHeatingValueUtility<0 || PID_MaxHeatingValueUtility>=OCR1A_MaxValue || isnan(PID_MaxHeatingValueUtility)) 
+{
+  PID_MaxHeatingValueUtility=0;
+  EEPROM.write(12,PID_MaxHeatingValueUtility); 
   EEPROM_Load();
 }
 
@@ -456,6 +570,7 @@ if (PID_MaxHeatingValue<0 || PID_MaxHeatingValue>=260 || isnan(PID_MaxHeatingVal
 //-----------------------------------------PRESS DETECT-----------------------------------------
 void Press_Detect()
 {
+InProgramMode=true; 
 digitalWrite(LED,HIGH);
 SetupProgram();
 delay(500);
@@ -469,15 +584,14 @@ Segment_Timer_Update();
 GPIO_Init();  
 EEPROM_Load();
 Timer_Init(); 
-
 }
 //-> start developing
 void loop() {
   // put your main code here, to run repeatedly:
-   // keep watching the push button:
-   btn.tick();
+   button.tick();
    CheckForParams();
    Read_Battery();
    PID_Compute();
-   delay(10);
+   
+   delay(100);
 }
