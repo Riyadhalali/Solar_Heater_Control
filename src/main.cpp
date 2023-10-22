@@ -592,6 +592,5 @@ void loop() {
    CheckForParams();
    Read_Battery();
    PID_Compute();
-   
    delay(100);
 }
