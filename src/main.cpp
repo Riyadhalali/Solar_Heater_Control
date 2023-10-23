@@ -534,7 +534,7 @@ if (Setpoint<0 || Setpoint>70 || isnan(Setpoint) )
 
 if (SolarMaxPower<0 || SolarMaxPower>100 || isnan(SolarMaxPower)) 
 {
-  SolarMaxPower=50;
+  SolarMaxPower=100;
   EEPROM.write(8,SolarMaxPower); 
   EEPROM_Load();
 }
