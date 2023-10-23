@@ -22,6 +22,7 @@ SevSeg sevseg; //Instantiate a seven segment object
 #define PULSE 4  //trigger pulse width (counts)
 #define LED 10
 #define OCR1A_MaxValue 255
+#define PIDMaxValue 100 // pid value just for selecting the max range 
 
 OneButton button = OneButton(
   Enter,  // Input pin for the button
@@ -36,12 +37,10 @@ unsigned int  ADC_Value=0;
 char txt[32];
 //Define Variables we'll be connecting to
 double Setpoint, Input, Output; // set point is the desired value for heating 
-
 //Specify the links and initial tuning parameters
-double Kp=20,Ki=10,Kd=0;
-double highestPowerInverter=50;
+double Kp=10,Ki=10,Kd=0;
 uint16_t ScreenTimer=0;
-float cutVoltage=12.5;
+float cutVoltage=0;
 double PID_Value,PID_P,PID_I,PID_Error;
 double HeatingPower=0;
 int x=0,y=0;
@@ -59,6 +58,8 @@ unsigned long longPressTime = 500; // Duration of a long press in milliseconds
 boolean loopRunning = false; // Flag indicating whether the loop is running
 bool InProgramMode=false; 
 char LoadsAlreadySwitchOff=0;
+unsigned long now; 
+double timeChange;
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
@@ -73,6 +74,8 @@ void Sample_Timing();
 void longPress();
 void shortPress(); 
 void SetUtilityMaxPower();
+void PID_ComputeForUtility();
+void CheckForGrid();
 //-------------------------------------------Functions---------------------------------------------- 
 void GPIO_Init()
 {
@@ -85,14 +88,8 @@ pinMode(PWM,OUTPUT);
 pinMode(A3,INPUT);  // battery voltage reading 
 pinMode(LED,OUTPUT); 
 attachInterrupt(digitalPinToInterrupt(2),AC_Control,FALLING);
-// Single Click event attachment
-
-//button.attachClick(Press_Detect);
-//button.setLongPressIntervalMs(500);  // Duration to hold a button to trigger a long press.
 button.setLongPressIntervalMs(100);
 button.attachLongPressStart(Press_Detect); // Attach a function to the long press stop event
-
-
 }
 
 //-----------------------------------------Interrupt-------------------------------------------
@@ -142,18 +139,14 @@ void Segment_Init()
   sevseg.begin(hardwareConfig, numDigits, digitPins, segmentPins, resistorsOnSegments,
   updateWithDelays, leadingZeros, disableDecPoint);
   sevseg.setBrightness(0);  // for clearing flockering in display 
-  
-  
-}
+  }
 //---------------------------------------Read Battery Voltage-----------------------------------
 void Read_Battery()
 {
 float sum=0 , Battery[10];
 ADC_Value=analogRead(A3);
-
 Battery_Voltage=(ADC_Value *5.0)/1024.0;
-
- for ( char i=0; i<10 ; i++)
+for ( char i=0; i<10 ; i++)
 {
 Battery[i]=((10.5/0.5)*Battery_Voltage);
 delay(10);
@@ -184,14 +177,12 @@ void Segment_Timer_Update ()
     {
     sevseg.setNumberF(Vin_Battery,1); // Displays '3.141'
     sevseg.refreshDisplay();
-    
     }
     if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0) 
     {
     sevseg.setNumber(HeatingPower); // Displays '3.141' 
     sevseg.refreshDisplay(); 
     }  
-  
 
     if (SetupProgramNumber==1) 
     {
@@ -259,12 +250,14 @@ void Segment_Timer_Update ()
 //---------------------------------------------------------------------------------
 void PID_Compute()
 {
+if (digitalRead(AC_Available_Grid)==1) 
+{
   //-> for solar heating power 
 if(Vin_Battery>=cutVoltage)
 {
   /*How long since we last calculated*/
-unsigned long now = millis();
-double timeChange = (double)(now - lastTime);
+now = millis();
+ timeChange = (double)(now - lastTime);
 if (timeChange >= SampleTimeInSeconds*1000)
 {
  // calculate error 
@@ -272,16 +265,16 @@ PID_Error=Vin_Battery-Setpoint;
  //calculate the p value 
 PID_P=Kp*PID_Error; 
 if (PID_P <0) PID_P=0;
-if (PID_P > PID_MaxHeatingValue) PID_P=PID_MaxHeatingValue; 
+if (PID_P > 100) PID_P=100; 
 // calculate the I controller 
 PID_I=PID_I+ (Ki*PID_Error);
 if (PID_I <0) PID_I=0;
-if (PID_I > PID_MaxHeatingValue) PID_I=PID_MaxHeatingValue; 
+if (PID_I > 100) PID_I=100; 
 // calcaulte the pid value final 
 PID_Value=PID_P+PID_I ; 
 // to make range of pid 
 if (PID_Value <0) PID_Value=0;
-if (PID_Value > PID_MaxHeatingValue) PID_Value=PID_MaxHeatingValue; 
+if (PID_Value > 100) PID_Value=100; 
 /*
 Calculation method:
 Solar Max Power : 40 % 
@@ -292,8 +285,8 @@ Timer_count=  ( 10 MS * 10^-3 ) * ( 8*10^6 ) / 256 = 311
 AS FROM TESTING :
 best value was 260 or lower so load can be still on when the heating power is zero 
  */
-HeatingPower=map(PID_Value,0,PID_MaxHeatingValue,0,SolarMaxPower); // map pid value show the range between 1- 260 what is the power 
-PWM_Value=map(PID_Value,0,PID_MaxHeatingValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260 
+HeatingPower=map(PID_Value,0,PIDMaxValue,0,SolarMaxPower); // map pid value show the range between 1- 260 what is the power 
+PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260 
 lastTime=now;  // save last time 
 } // end if sample time 
 }
@@ -302,9 +295,14 @@ else  if (Vin_Battery<= cutVoltage)
   PID_Value=0; 
   PID_I=0; 
   PID_P=0;
-  HeatingPower=map(PID_Value,0,PID_MaxHeatingValue,0,SolarMaxPower);
-  OCR1A=map(PID_Value,0,PID_MaxHeatingValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260
+  HeatingPower=map(PID_Value,0,PIDMaxValue,0,SolarMaxPower);
+  OCR1A=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260
   // we also can stop timer to make output zero but i have done it in interrupts 
+}
+} // end if ac_available grid 
+else if(digitalRead(AC_Available_Grid)==0)
+{
+  PID_ComputeForUtility();
 }
 }
 //-------------------------------------------Timer Init---------------------------------------
@@ -567,6 +565,56 @@ if (PID_MaxHeatingValueUtility<0 || PID_MaxHeatingValueUtility>=OCR1A_MaxValue |
 }
 
 }
+//-----------------------------------------Check For Grid--------------------------------------
+void PID_ComputeForUtility()
+{
+
+  /*How long since we last calculated*/
+unsigned long now = millis();
+double timeChange = (double)(now - lastTime);
+if (timeChange >= SampleTimeInSeconds*1000)
+{
+ // calculate error 
+PID_Error=Vin_Battery-Setpoint; 
+ //calculate the p value 
+PID_P=Kp*PID_Error; 
+if (PID_P <0) PID_P=0;
+if (PID_P > PIDMaxValue) PID_P=PIDMaxValue; 
+// calculate the I controller 
+PID_I=PID_I+ (Ki*PID_Error);
+if (PID_I <0) PID_I=0;
+if (PID_I > PIDMaxValue) PID_I=PIDMaxValue; 
+// calcaulte the pid value final 
+PID_Value=PID_P+PID_I ; 
+// to make range of pid 
+if (PID_Value <0) PID_Value=0;
+if (PID_Value > PIDMaxValue) PID_Value=PIDMaxValue; 
+HeatingPower=map(PID_Value,0,PIDMaxValue,0,UtilityMaxPower); // map pid value show the range between 1- 260 what is the power 
+PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValueUtility+1); // minus value of pwm is 1 and max value is 260 
+lastTime=now;  // save last time 
+} // end if sample time 
+
+}
+
+//------------------------------------------Check For Grid-------------------------------------
+void CheckForGrid()
+{
+if(digitalRead(AC_Available_Grid)==0 && LoadsAlreadySwitchOff==0)
+{
+LoadsAlreadySwitchOff=1; 
+PID_Value=0; 
+PID_I=0; 
+PID_P=0;
+} 
+else if (digitalRead(AC_Available_Grid)==1 && LoadsAlreadySwitchOff==1)
+{
+LoadsAlreadySwitchOff=0;  
+PID_Value=0; 
+PID_I=0; 
+PID_P=0;
+}
+
+}
 //-----------------------------------------PRESS DETECT-----------------------------------------
 void Press_Detect()
 {
@@ -592,5 +640,6 @@ void loop() {
    CheckForParams();
    Read_Battery();
    PID_Compute();
+   CheckForGrid();
    delay(100);
 }
