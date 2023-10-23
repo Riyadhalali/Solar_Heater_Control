@@ -38,7 +38,7 @@ char txt[32];
 //Define Variables we'll be connecting to
 double Setpoint, Input, Output; // set point is the desired value for heating 
 //Specify the links and initial tuning parameters
-double Kp=20,Ki=20,Kd=0;
+double Kp=10,Ki=10,Kd=0;
 uint16_t ScreenTimer=0;
 float cutVoltage=0;
 double PID_Value,PID_P,PID_I,PID_Error;
