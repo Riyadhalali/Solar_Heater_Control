@@ -460,6 +460,7 @@ EEPROM.write(9,PID_MaxHeatingValue); // for solar this value
 PID_Value=0; 
 PID_I=0; 
 PID_P=0; 
+PWM_Value=0;
 }
 //-----------------------------------------Sampling time-----------------------------------------
 void Sample_Timing()
@@ -528,6 +529,10 @@ if (UtilityMaxPower<0) UtilityMaxPower=0;
 PID_MaxHeatingValueUtility=OCR1A_MaxValue - ( 2.5 * UtilityMaxPower);  // (2.5 = 255 / 100 )
 EEPROM.write(11,UtilityMaxPower); 
 EEPROM.write(12,PID_MaxHeatingValueUtility); // for solar this value
+PID_Value=0; 
+PID_I=0; 
+PID_P=0; 
+PWM_Value=0;
 }
 //-----------------------------------------EEPROM Load------------------------------------------
 void EEPROM_Load()
