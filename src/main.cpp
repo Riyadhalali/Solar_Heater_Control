@@ -615,7 +615,7 @@ unsigned long now = millis();
 double timeChange = (double)(now - lastTime);
 if (timeChange >= SampleTimeInSeconds*1000)
 {
- // calculate error 
+/*  // calculate error 
 PID_Error=Vin_Battery-Setpoint; 
  //calculate the p value 
 PID_P=Kp*PID_Error; 
@@ -629,7 +629,11 @@ if (PID_I > PIDMaxValue) PID_I=PIDMaxValue;
 PID_Value=PID_P+PID_I ; 
 // to make range of pid 
 if (PID_Value <0) PID_Value=0;
-if (PID_Value > PIDMaxValue) PID_Value=PIDMaxValue; 
+if (PID_Value > PIDMaxValue) PID_Value=PIDMaxValue;  */
+// when grid available just increment the heating power regarless of the battery we don
+PID_Value++; 
+if (PID_Value <0) PID_Value=0;
+if (PID_Value > PIDMaxValue) PID_Value=PIDMaxValue;
 HeatingPower=map(PID_Value,0,PIDMaxValue,0,UtilityMaxPower); // map pid value show the range between 1- 260 what is the power 
 PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValueUtility+1); // minus value of pwm is 1 and max value is 260 
 lastTime=now;  // save last time 
