@@ -51,15 +51,23 @@ char SolarMaxPower=0,UtilityMaxPower=0;
 char GridMaxPower=0; 
 float PID_MaxHeatingValue;
 float PID_MaxHeatingValueUtility;
-unsigned long lastTime; // for timing in PID controller 
+unsigned long lastTime;// for timing in PID controller 
 int SampleTimeInSeconds=0;
 int PWM_Value;
 unsigned long longPressTime = 500; // Duration of a long press in milliseconds
 boolean loopRunning = false; // Flag indicating whether the loop is running
 bool InProgramMode=false; 
 char LoadsAlreadySwitchOff=0;
-unsigned long now; 
+unsigned long now;
 double timeChange;
+char CountRealTimeSeconds=0; // to start counting real time seconds 
+unsigned int SecondsReadTime=0; 
+unsigned int overflowTimes=0; 
+int ledState=LOW;
+unsigned long previousMillis = 0;  // will store last time LED was updated
+  unsigned long currentMillis=0;
+// constants won't change:
+const long interval = 1000;  // interval at which to blink (milliseconds)
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
@@ -76,6 +84,8 @@ void shortPress();
 void SetUtilityMaxPower();
 void PID_ComputeForUtility();
 void CheckForGrid();
+void FactorySettings();
+void Timer_Seconds();
 //-------------------------------------------Functions---------------------------------------------- 
 void GPIO_Init()
 {
@@ -245,6 +255,7 @@ void Segment_Timer_Update ()
     sevseg.refreshDisplay(); 
     } 
   if (ScreenTimer > 7000) ScreenTimer=0; 
+  CheckForGrid();
 
  }
 //---------------------------------------------------------------------------------
@@ -287,9 +298,11 @@ best value was 260 or lower so load can be still on when the heating power is ze
  */
 HeatingPower=map(PID_Value,0,PIDMaxValue,0,SolarMaxPower); // map pid value show the range between 1- 260 what is the power 
 PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260 
-lastTime=now;  // save last time 
+lastTime=now;  // save last time for sampling time 
+
 } // end if sample time 
-}
+}  //end if vin_battery 
+
 else  if (Vin_Battery<= cutVoltage)
 {
   PID_Value=0; 
@@ -298,11 +311,21 @@ else  if (Vin_Battery<= cutVoltage)
   HeatingPower=map(PID_Value,0,PIDMaxValue,0,SolarMaxPower);
   OCR1A=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260
   // we also can stop timer to make output zero but i have done it in interrupts 
-}
+}  // end else if 
 } // end if ac_available grid 
 else if(digitalRead(AC_Available_Grid)==0)
 {
-  PID_ComputeForUtility();
+  currentMillis = millis();
+  if (currentMillis - previousMillis >= 1000)  // encrement variable every second 
+  {
+  previousMillis = currentMillis;
+  SecondsReadTime++; 
+  }
+
+  if (SecondsReadTime> 10)  // check for the delay time required to start 
+  {
+    PID_ComputeForUtility();
+  }
 }
 }
 //-------------------------------------------Timer Init---------------------------------------
@@ -433,6 +456,10 @@ if (SolarMaxPower<0) SolarMaxPower=0;
 PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 100 )
 EEPROM.write(8,SolarMaxPower); 
 EEPROM.write(9,PID_MaxHeatingValue); // for solar this value 
+//-> must zero all values so the inverter want have a big ampers causing it to restart
+PID_Value=0; 
+PID_I=0; 
+PID_P=0; 
 }
 //-----------------------------------------Sampling time-----------------------------------------
 void Sample_Timing()
@@ -605,16 +632,30 @@ LoadsAlreadySwitchOff=1;
 PID_Value=0; 
 PID_I=0; 
 PID_P=0;
+PWM_Value=0;
+HeatingPower=0;
+SecondsReadTime=0;
 } 
-else if (digitalRead(AC_Available_Grid)==1 && LoadsAlreadySwitchOff==1)
+else if (digitalRead(AC_Available_Grid)==1 && LoadsAlreadySwitchOff==1 )
 {
 LoadsAlreadySwitchOff=0;  
 PID_Value=0; 
 PID_I=0; 
 PID_P=0;
+PWM_Value=0;
+HeatingPower=0;
+SecondsReadTime=0;
 }
+}
+//---------------------------------------Factory Settings--------------------------------------
+void FactorySettings()
+{
+
+
+
 
 }
+
 //-----------------------------------------PRESS DETECT-----------------------------------------
 void Press_Detect()
 {
