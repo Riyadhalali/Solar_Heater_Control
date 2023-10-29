@@ -263,12 +263,21 @@ void PID_Compute()
 {
 if (digitalRead(AC_Available_Grid)==1) 
 {
+
+  currentMillis = millis();
+  if (currentMillis - previousMillis >= 1000)  // encrement variable every second 
+  {
+  previousMillis = currentMillis;
+  SecondsReadTime++; 
+  }
+if (SecondsReadTime>5) 
+{
   //-> for solar heating power 
 if(Vin_Battery>=cutVoltage)
 {
   /*How long since we last calculated*/
 now = millis();
- timeChange = (double)(now - lastTime);
+timeChange = (double)(now - lastTime);
 if (timeChange >= SampleTimeInSeconds*1000)
 {
  // calculate error 
@@ -299,7 +308,7 @@ best value was 260 or lower so load can be still on when the heating power is ze
 HeatingPower=map(PID_Value,0,PIDMaxValue,0,SolarMaxPower); // map pid value show the range between 1- 260 what is the power 
 PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260 
 lastTime=now;  // save last time for sampling time 
-
+} // end if sample 
 } // end if sample time 
 }  //end if vin_battery 
 
