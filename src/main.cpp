@@ -61,7 +61,7 @@ char LoadsAlreadySwitchOff=0;
 unsigned long now;
 double timeChange;
 char CountRealTimeSeconds=0; // to start counting real time seconds 
-unsigned int SecondsReadTime=0; 
+unsigned int SecondsReadTime=0,DelayTime=0;
 unsigned int overflowTimes=0; 
 int ledState=LOW;
 unsigned long previousMillis = 0;  // will store last time LED was updated
@@ -86,6 +86,7 @@ void PID_ComputeForUtility();
 void CheckForGrid();
 void FactorySettings();
 void Timer_Seconds();
+void SetDelayTime();
 //-------------------------------------------Functions---------------------------------------------- 
 void GPIO_Init()
 {
@@ -221,6 +222,11 @@ void Segment_Timer_Update ()
     sevseg.setChars("P05"); 
     sevseg.refreshDisplay(); 
     } 
+     if (SetupProgramNumber==6) 
+    {
+    sevseg.setChars("P06"); 
+    sevseg.refreshDisplay(); 
+    } 
 
 
     // displaying variables 
@@ -249,13 +255,20 @@ void Segment_Timer_Update ()
     sevseg.setNumber(SampleTimeInSeconds);
     sevseg.refreshDisplay(); 
     } 
-       if (SetupProgramNumber==15)    
+    if (SetupProgramNumber==15)    
     {
     sevseg.setNumber(UtilityMaxPower);
     sevseg.refreshDisplay(); 
     } 
+      if (SetupProgramNumber==16)    
+    {
+    sevseg.setNumber(DelayTime);
+    sevseg.refreshDisplay(); 
+    } 
+
   if (ScreenTimer > 7000) ScreenTimer=0; 
-  CheckForGrid();
+
+  CheckForGrid();   // to catch the grid 
 
  }
 //---------------------------------------------------------------------------------
@@ -263,17 +276,16 @@ void PID_Compute()
 {
 if (digitalRead(AC_Available_Grid)==1) 
 {
-
-  currentMillis = millis();
-  if (currentMillis - previousMillis >= 1000)  // encrement variable every second 
-  {
-  previousMillis = currentMillis;
-  SecondsReadTime++; 
-  }
-if (SecondsReadTime>5) 
-{
   //-> for solar heating power 
 if(Vin_Battery>=cutVoltage)
+{
+ currentMillis = millis();
+if (currentMillis - previousMillis >= 1000)  // encrement variable every second 
+{
+previousMillis = currentMillis;
+SecondsReadTime++; 
+}
+if (SecondsReadTime>DelayTime) 
 {
   /*How long since we last calculated*/
 now = millis();
@@ -331,7 +343,7 @@ else if(digitalRead(AC_Available_Grid)==0)
   SecondsReadTime++; 
   }
 
-  if (SecondsReadTime> 10)  // check for the delay time required to start 
+  if (SecondsReadTime> DelayTime)  // check for the delay time required to start 
   {
     PID_ComputeForUtility();
   }
@@ -352,15 +364,17 @@ void SetupProgram()
 insideSetup=1;
 SetupProgramNumber=1; 
 SetCutVoltage();
-delay(200);
+delay(500);
 SetFloatVoltage();   // set point 
-delay(200);
+delay(500);
 SetSolarMaxPower();
-delay(200);
+delay(500);
 Sample_Timing();
-delay(200);
+delay(500);
 SetUtilityMaxPower();
-delay(200);
+delay(500);
+SetDelayTime(); 
+delay(500);
 SetupProgramNumber=0; 
 insideSetup=0;
 }
@@ -368,15 +382,15 @@ insideSetup=0;
 //----------------------------------------Set Cut Voltage--------------------------------------
 void SetCutVoltage()
 {
-delay(200);
-while (digitalRead(Enter)==0 && InProgramMode==true) 
+delay(500);
+while (digitalRead(Enter)==0 ) 
 {
   SetupProgramNumber=1; 
   /* sevseg.setChars("P00"); 
 sevseg.refreshDisplay(); */
 }
-delay(200);
-while (digitalRead(Enter)==0 && InProgramMode==true)
+delay(500);
+while (digitalRead(Enter)==0 )
 {
   SetupProgramNumber=10;
 
@@ -401,14 +415,14 @@ EEPROM.put(0,cutVoltage);
 //---------------------------------------Set Float Vooltage----------------------------------
 void SetFloatVoltage()
 {
-delay(200);
+delay(500);
 while (digitalRead(Enter)==0) 
 {
   SetupProgramNumber=2;
 /* sevseg.setChars("P01"); 
 sevseg.refreshDisplay(); */
 }
-delay(200);
+delay(500);
 while (digitalRead(Enter)==0)
 {
   SetupProgramNumber=12; 
@@ -433,14 +447,14 @@ EEPROM.put(4,Setpoint);
 //------------------------------------------Set Solar Max Power----------------------------------
 void SetSolarMaxPower()
 {
-delay(200);
+delay(500);
 while(digitalRead(Enter)==0 )
 {
   SetupProgramNumber=3;
 /*  sevseg.setChars("P02"); 
  sevseg.refreshDisplay(); */ 
 } 
-delay(200); 
+delay(500); 
 while (digitalRead(Enter)==0 )
 {
   SetupProgramNumber=13;
@@ -474,14 +488,14 @@ PWM_Value=0;
 //-----------------------------------------Sampling time-----------------------------------------
 void Sample_Timing()
 {
-delay(200);
+delay(500);
  while(digitalRead(Enter)==0)
 {
   SetupProgramNumber=4;
  /* sevseg.setChars("P03"); 
  sevseg.refreshDisplay();  */
 }
-delay(200);
+delay(500);
 while (digitalRead(Enter)==0) 
 {
   SetupProgramNumber=14;
@@ -506,14 +520,14 @@ EEPROM.write(10,SampleTimeInSeconds);
 //-----------------------------------------Set utility max power-------------------------------
 void SetUtilityMaxPower()
 {
-delay(200);
+delay(500);
 while(digitalRead(Enter)==0 )
 {
 SetupProgramNumber=5;
 /*  sevseg.setChars("P02"); 
  sevseg.refreshDisplay(); */ 
 } 
-delay(200); 
+delay(500); 
 while (digitalRead(Enter)==0 )
 {
 SetupProgramNumber=15;
@@ -543,6 +557,41 @@ PID_I=0;
 PID_P=0; 
 PWM_Value=0;
 }
+//-----------------------------------------SetDelayTime----------------------------------------
+void SetDelayTime()
+{
+delay(500);
+while(digitalRead(Enter)==0 )
+{
+SetupProgramNumber=6;
+/*  sevseg.setChars("P02"); 
+ sevseg.refreshDisplay(); */ 
+} 
+delay(500); 
+while (digitalRead(Enter)==0 )
+{
+SetupProgramNumber=16;
+/* sevseg.setNumber(SolarMaxPower); 
+sevseg.refreshDisplay();  */
+while (digitalRead(Up)==1 || digitalRead(Down)==1) 
+{
+if (digitalRead(Up)==1) 
+{
+delay(100);
+DelayTime++;
+}
+if (digitalRead(Down)==1) 
+{
+delay(100);
+DelayTime--;
+}
+if (DelayTime>900)  DelayTime=0;
+if (DelayTime<0) DelayTime=0;
+} // end while up and down
+}  // end main while 
+EEPROM.put(13,DelayTime); 
+SecondsReadTime=0; 
+}
 //-----------------------------------------EEPROM Load------------------------------------------
 void EEPROM_Load()
 {
@@ -555,6 +604,7 @@ PID_MaxHeatingValue=EEPROM.read(9);
 SampleTimeInSeconds=EEPROM.read(10);
 UtilityMaxPower=EEPROM.read(11);
 PID_MaxHeatingValueUtility=EEPROM.read(12);
+EEPROM.get(13,DelayTime); 
 }
 //---------------------------------------CheckForParams-----------------------------------------
 void CheckForParams()
@@ -604,6 +654,14 @@ if (PID_MaxHeatingValueUtility<0 || PID_MaxHeatingValueUtility>=OCR1A_MaxValue |
   EEPROM.write(12,PID_MaxHeatingValueUtility); 
   EEPROM_Load();
 }
+
+if (DelayTime<0 || DelayTime>=900 || isnan(DelayTime)) 
+{
+  DelayTime=60;
+  EEPROM.put(13,DelayTime); 
+  EEPROM_Load();
+}
+
 
 }
 //-----------------------------------------Check For Grid--------------------------------------
