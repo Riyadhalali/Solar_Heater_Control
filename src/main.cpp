@@ -123,7 +123,7 @@ else if(PWM_Value<255 )
 TCCR1B=0x04; //start timer with divide by 256 input
 OCR1A=PWM_Value;
 }
-
+//CheckForGrid();
 }
 ISR(TIMER1_COMPA_vect)
 { //comparator match
@@ -160,7 +160,7 @@ Battery_Voltage=(ADC_Value *5.0)/1024.0;
 for ( char i=0; i<10 ; i++)
 {
 Battery[i]=((10.5/0.5)*Battery_Voltage);
-delay(10);
+delay(50);
 sum+=Battery[i];
 } 
 
@@ -268,7 +268,7 @@ void Segment_Timer_Update ()
 
   if (ScreenTimer > 7000) ScreenTimer=0; 
 
-  CheckForGrid();   // to catch the grid 
+ // CheckForGrid();   // to catch the grid 
 
  }
 //---------------------------------------------------------------------------------
@@ -657,7 +657,7 @@ if (PID_MaxHeatingValueUtility<0 || PID_MaxHeatingValueUtility>=OCR1A_MaxValue |
 
 if (DelayTime<0 || DelayTime>=900 || isnan(DelayTime)) 
 {
-  DelayTime=60;
+  DelayTime=10;
   EEPROM.put(13,DelayTime); 
   EEPROM_Load();
 }
@@ -696,9 +696,7 @@ HeatingPower=map(PID_Value,0,PIDMaxValue,0,UtilityMaxPower); // map pid value sh
 PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValueUtility+1); // minus value of pwm is 1 and max value is 260 
 lastTime=now;  // save last time 
 } // end if sample time 
-
 }
-
 //------------------------------------------Check For Grid-------------------------------------
 void CheckForGrid()
 {
@@ -708,7 +706,7 @@ LoadsAlreadySwitchOff=1;
 PID_Value=0; 
 PID_I=0; 
 PID_P=0;
-PWM_Value=0;
+//PWM_Value=0;
 HeatingPower=0;
 SecondsReadTime=0;
 } 
@@ -718,7 +716,7 @@ LoadsAlreadySwitchOff=0;
 PID_Value=0; 
 PID_I=0; 
 PID_P=0;
-PWM_Value=0;
+//PWM_Value=0;
 HeatingPower=0;
 SecondsReadTime=0;
 }
@@ -731,7 +729,6 @@ void FactorySettings()
 
 
 }
-
 //-----------------------------------------PRESS DETECT-----------------------------------------
 void Press_Detect()
 {
@@ -757,6 +754,6 @@ void loop() {
    CheckForParams();
    Read_Battery();
    PID_Compute();
-   CheckForGrid();
+   CheckForGrid();   
    delay(100);
 }
