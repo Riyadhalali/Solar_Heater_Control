@@ -123,7 +123,7 @@ else if(PWM_Value<255 )
 TCCR1B=0x04; //start timer with divide by 256 input
 OCR1A=PWM_Value;
 }
-//CheckForGrid();
+CheckForGrid();
 }
 ISR(TIMER1_COMPA_vect)
 { //comparator match
@@ -268,10 +268,13 @@ void Segment_Timer_Update ()
 
   if (ScreenTimer > 7000) ScreenTimer=0; 
 
- // CheckForGrid();   // to catch the grid 
+  CheckForGrid();   // to catch the grid 
 
  }
 //---------------------------------------------------------------------------------
+
+
+
 void PID_Compute()
 {
 if (digitalRead(AC_Available_Grid)==1) 
@@ -287,7 +290,7 @@ SecondsReadTime++;
 }
 if (SecondsReadTime>DelayTime) 
 {
-  /*How long since we last calculated*/
+  //How long since we last calculated
 now = millis();
 timeChange = (double)(now - lastTime);
 if (timeChange >= SampleTimeInSeconds*1000)
@@ -330,7 +333,7 @@ else  if (Vin_Battery<= cutVoltage)
   PID_I=0; 
   PID_P=0;
   HeatingPower=map(PID_Value,0,PIDMaxValue,0,SolarMaxPower);
-  OCR1A=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260
+  PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260
   // we also can stop timer to make output zero but i have done it in interrupts 
 }  // end else if 
 } // end if ac_available grid 
