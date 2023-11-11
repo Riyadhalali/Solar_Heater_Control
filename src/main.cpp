@@ -123,7 +123,7 @@ else if(PWM_Value<255 )
 TCCR1B=0x04; //start timer with divide by 256 input
 OCR1A=PWM_Value;
 }
-CheckForGrid();
+//CheckForGrid();
 }
 ISR(TIMER1_COMPA_vect)
 { //comparator match
@@ -268,7 +268,7 @@ void Segment_Timer_Update ()
 
   if (ScreenTimer > 7000) ScreenTimer=0; 
 
-  CheckForGrid();   // to catch the grid 
+ // CheckForGrid();   // to catch the grid 
 
  }
 //---------------------------------------------------------------------------------
@@ -628,7 +628,7 @@ if (Setpoint<0 || Setpoint>70 || isnan(Setpoint) )
 
 if (SolarMaxPower<0 || SolarMaxPower>100 || isnan(SolarMaxPower)) 
 {
-  SolarMaxPower=100;
+  SolarMaxPower=50;
   EEPROM.write(8,SolarMaxPower); 
   EEPROM_Load();
 }
@@ -646,7 +646,7 @@ if (SampleTimeInSeconds<0 || SampleTimeInSeconds>100 || isnan(SampleTimeInSecond
 }
 if (UtilityMaxPower<0 || UtilityMaxPower>100 || isnan(UtilityMaxPower)) 
 {
-  UtilityMaxPower=50;
+  UtilityMaxPower=100;
   EEPROM.write(11,UtilityMaxPower); 
   EEPROM_Load();
 }
@@ -660,7 +660,7 @@ if (PID_MaxHeatingValueUtility<0 || PID_MaxHeatingValueUtility>=OCR1A_MaxValue |
 
 if (DelayTime<0 || DelayTime>=900 || isnan(DelayTime)) 
 {
-  DelayTime=10;
+  DelayTime=1;
   EEPROM.put(13,DelayTime); 
   EEPROM_Load();
 }
@@ -709,7 +709,7 @@ LoadsAlreadySwitchOff=1;
 PID_Value=0; 
 PID_I=0; 
 PID_P=0;
-//PWM_Value=0;
+PWM_Value=0;
 HeatingPower=0;
 SecondsReadTime=0;
 } 
@@ -719,7 +719,7 @@ LoadsAlreadySwitchOff=0;
 PID_Value=0; 
 PID_I=0; 
 PID_P=0;
-//PWM_Value=0;
+PWM_Value=0;
 HeatingPower=0;
 SecondsReadTime=0;
 }
