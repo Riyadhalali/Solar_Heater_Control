@@ -13,16 +13,17 @@ set point is the float voltage for system and must be made
 //--------------------------------------Special Defines---------------------------------------------
 SevSeg sevseg; //Instantiate a seven segment object
 
-#define AC_Available_Grid 7
+#define AC_Available_Grid 3
 #define AC_Available_Inverter 2
 #define Enter A5
 #define Up 1
 #define Down 0
 #define PWM 9	
 #define PULSE 4  //trigger pulse width (counts)
-#define LED 10
 #define OCR1A_MaxValue 255
 #define PIDMaxValue 100 // pid value just for selecting the max range 
+#define Fan A4
+#define Contactor 8
 
 OneButton button = OneButton(
   Enter,  // Input pin for the button
@@ -30,7 +31,7 @@ OneButton button = OneButton(
   false        // Disable internal pull-up resistor
 );
 //----------------------------------------Variables-------------------------------------------------
-byte A=A1,B=12,C=5,D=3,E=8,F=A0,G=6,H=4;   // define pins 
+byte A=A1,B=12,C=5,D=7,E=10,F=A0,G=6,H=4;   // define pins 
 byte Display_1=A2,Display_2=11,Display_3=13; // define display ports control 
 float Battery_Voltage=0,Vin_Battery=0;
 unsigned int  ADC_Value=0;  
@@ -38,7 +39,7 @@ char txt[32];
 //Define Variables we'll be connecting to
 double Setpoint, Input, Output; // set point is the desired value for heating 
 //Specify the links and initial tuning parameters
-double Kp=10,Ki=10,Kd=0;
+double Kp=5,Ki=5,Kd=0;
 uint16_t ScreenTimer=0;
 float cutVoltage=0;
 double PID_Value,PID_P,PID_I,PID_Error;
@@ -65,9 +66,14 @@ unsigned int SecondsReadTime=0,DelayTime=0;
 unsigned int overflowTimes=0; 
 int ledState=LOW;
 unsigned long previousMillis = 0;  // will store last time LED was updated
-  unsigned long currentMillis=0;
+unsigned long currentMillis=0;
 // constants won't change:
 const long interval = 1000;  // interval at which to blink (milliseconds)
+char fanState=0;
+
+unsigned long currentMillisFan,previousMillisFan;
+char secondsFan=0; 
+char fanTime=60;  // fan time to turn off is 60 seconds 
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
@@ -87,6 +93,8 @@ void CheckForGrid();
 void FactorySettings();
 void Timer_Seconds();
 void SetDelayTime();
+void Grid_Turn_Off();
+void checkFan();
 //-------------------------------------------Functions---------------------------------------------- 
 void GPIO_Init()
 {
@@ -97,12 +105,19 @@ pinMode(Up,INPUT);
 pinMode(Down,INPUT);
 pinMode(PWM,OUTPUT);
 pinMode(A3,INPUT);  // battery voltage reading 
-pinMode(LED,OUTPUT); 
+pinMode(Fan,OUTPUT); 
+pinMode(Contactor,OUTPUT);
 attachInterrupt(digitalPinToInterrupt(2),AC_Control,FALLING);
+attachInterrupt(digitalPinToInterrupt(3),Grid_Turn_Off,RISING);
 button.setLongPressIntervalMs(100);
 button.attachLongPressStart(Press_Detect); // Attach a function to the long press stop event
 }
 
+//-----------------------------------------Grid Switch Off-------------------------------------
+void Grid_Turn_Off()
+{
+CheckForGrid();
+}
 //-----------------------------------------Interrupt-------------------------------------------
 void AC_Control()
 {
@@ -712,6 +727,7 @@ PID_P=0;
 PWM_Value=0;
 HeatingPower=0;
 SecondsReadTime=0;
+
 } 
 else if (digitalRead(AC_Available_Grid)==1 && LoadsAlreadySwitchOff==1 )
 {
@@ -732,6 +748,31 @@ void FactorySettings()
 
 
 }
+//---------------------------------------Fan Turn Off------------------------------------------
+void checkFan()
+{ 
+
+if (PWM_Value>=255)
+{ 
+fanState=0;                // heating is off make this variable off and turn fan after 60 seconds
+currentMillisFan=millis();
+if(currentMillisFan-previousMillisFan>=1000)
+{
+previousMillisFan=currentMillisFan;
+secondsFan++ ; 
+}
+if (secondsFan>=fanTime) 
+{
+  digitalWrite(Fan,LOW); //turn off fan after 60 seconds
+  secondsFan=0;
+}
+}  
+if (PWM_Value>0 && PWM_Value <255)
+{ 
+  fanState=1; //heating is on so fan must turn on 
+  digitalWrite(Fan,HIGH);  //turn on fan  
+}
+}
 //-----------------------------------------PRESS DETECT-----------------------------------------
 void Press_Detect()
 {
@@ -741,6 +782,7 @@ SetupProgram();
 delay(500);
 digitalWrite(LED,LOW);
 }
+
 //*****************************************MAIN LOOP********************************************
 void setup() {
   // put your setup code here, to run once:
@@ -748,7 +790,7 @@ Segment_Init();
 Segment_Timer_Update();
 GPIO_Init();  
 EEPROM_Load();
-Timer_Init(); 
+Timer_Init();   
 }
 //-> start developing
 void loop() {
@@ -758,5 +800,6 @@ void loop() {
    Read_Battery();
    PID_Compute();
    CheckForGrid();   
+   checkFan();
    delay(100);
 }
