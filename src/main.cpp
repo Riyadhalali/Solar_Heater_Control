@@ -175,7 +175,7 @@ Battery_Voltage=(ADC_Value *5.0)/1024.0;
 for ( char i=0; i<10 ; i++)
 {
 Battery[i]=((10.5/0.5)*Battery_Voltage);
-delay(50);
+delay(100);
 sum+=Battery[i];
 } 
 
@@ -727,6 +727,7 @@ PID_P=0;
 PWM_Value=0;
 HeatingPower=0;
 SecondsReadTime=0;
+digitalWrite(Contactor,1);   // TURN ON CONTACTOR
 
 } 
 else if (digitalRead(AC_Available_Grid)==1 && LoadsAlreadySwitchOff==1 )
@@ -738,6 +739,7 @@ PID_P=0;
 PWM_Value=0;
 HeatingPower=0;
 SecondsReadTime=0;
+digitalWrite(Contactor,0);  // TURN OFF CONTACTOR
 }
 }
 //---------------------------------------Factory Settings--------------------------------------
