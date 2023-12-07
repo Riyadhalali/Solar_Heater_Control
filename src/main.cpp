@@ -39,7 +39,7 @@ char txt[32];
 //Define Variables we'll be connecting to
 double Setpoint, Input, Output; // set point is the desired value for heating 
 //Specify the links and initial tuning parameters
-double Kp=5,Ki=5,Kd=0;
+double Kp=1,Ki=1,Kd=0;
 uint16_t ScreenTimer=0;
 float cutVoltage=0;
 double PID_Value,PID_P,PID_I,PID_Error;
@@ -70,10 +70,12 @@ unsigned long currentMillis=0;
 // constants won't change:
 const long interval = 1000;  // interval at which to blink (milliseconds)
 char fanState=0;
-
 unsigned long currentMillisFan,previousMillisFan;
 char secondsFan=0; 
 char fanTime=60;  // fan time to turn off is 60 seconds 
+char SystemBatteryMode=0; // for checking the battery system  mode 
+char displayResetMessage=0;
+unsigned int esc=0;
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
@@ -90,11 +92,13 @@ void shortPress();
 void SetUtilityMaxPower();
 void PID_ComputeForUtility();
 void CheckForGrid();
-void FactorySettings();
+void factorySettings();
 void Timer_Seconds();
 void SetDelayTime();
 void Grid_Turn_Off();
 void checkFan();
+void CheckSystemBatteryMode();
+void EEPROM_FactorySettings();
 //-------------------------------------------Functions---------------------------------------------- 
 void GPIO_Init()
 {
@@ -169,16 +173,16 @@ void Segment_Init()
 //---------------------------------------Read Battery Voltage-----------------------------------
 void Read_Battery()
 {
+unsigned char i=0;
 float sum=0 , Battery[10];
+for (  i=0; i<10 ; i++)
+{
 ADC_Value=analogRead(A3);
 Battery_Voltage=(ADC_Value *5.0)/1024.0;
-for ( char i=0; i<10 ; i++)
-{
 Battery[i]=((10.5/0.5)*Battery_Voltage);
-delay(100);
 sum+=Battery[i];
+delay(100);
 } 
-
 Vin_Battery=sum/10.0;
 }
 //-------------------------------------Timer for updating screen reads--------------------------
@@ -199,12 +203,12 @@ void Segment_Timer_Update ()
     TCNT2=0;    // very important 
     
     ScreenTimer++;
-    if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0)
+    if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0)
     {
     sevseg.setNumberF(Vin_Battery,1); // Displays '3.141'
     sevseg.refreshDisplay();
     }
-    if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0) 
+    if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0) 
     {
     sevseg.setNumber(HeatingPower); // Displays '3.141' 
     sevseg.refreshDisplay(); 
@@ -281,9 +285,22 @@ void Segment_Timer_Update ()
     sevseg.refreshDisplay(); 
     } 
 
+
+    if (displayResetMessage==1)
+    {
+      sevseg.setChars("RST");
+      sevseg.refreshDisplay();
+      esc++; 
+      if (esc==50)
+      {
+        displayResetMessage=0;
+        esc=0;
+      }
+    }
+
   if (ScreenTimer > 7000) ScreenTimer=0; 
 
- // CheckForGrid();   // to catch the grid 
+ 
 
  }
 //---------------------------------------------------------------------------------
@@ -655,7 +672,7 @@ if (PID_MaxHeatingValue<0 || PID_MaxHeatingValue>=OCR1A_MaxValue || isnan(PID_Ma
 }
 if (SampleTimeInSeconds<0 || SampleTimeInSeconds>100 || isnan(SampleTimeInSeconds)) 
 {
-  SampleTimeInSeconds=5;
+  SampleTimeInSeconds=1;
   EEPROM.write(10,SampleTimeInSeconds); 
   EEPROM_Load();
 }
@@ -675,7 +692,7 @@ if (PID_MaxHeatingValueUtility<0 || PID_MaxHeatingValueUtility>=OCR1A_MaxValue |
 
 if (DelayTime<0 || DelayTime>=900 || isnan(DelayTime)) 
 {
-  DelayTime=1;
+  DelayTime=10;
   EEPROM.put(13,DelayTime); 
   EEPROM_Load();
 }
@@ -706,7 +723,7 @@ PID_Value=PID_P+PID_I ;
 // to make range of pid 
 if (PID_Value <0) PID_Value=0;
 if (PID_Value > PIDMaxValue) PID_Value=PIDMaxValue;  */
-// when grid available just increment the heating power regarless of the battery we don
+// when grid available just increment the heating power regarless of the battery we done 
 PID_Value++; 
 if (PID_Value <0) PID_Value=0;
 if (PID_Value > PIDMaxValue) PID_Value=PIDMaxValue;
@@ -742,14 +759,6 @@ SecondsReadTime=0;
 digitalWrite(Contactor,0);  // TURN OFF CONTACTOR
 }
 }
-//---------------------------------------Factory Settings--------------------------------------
-void FactorySettings()
-{
-
-
-
-
-}
 //---------------------------------------Fan Turn Off------------------------------------------
 void checkFan()
 { 
@@ -774,6 +783,63 @@ if (PWM_Value>0 && PWM_Value <255)
   fanState=1; //heating is on so fan must turn on 
   digitalWrite(Fan,HIGH);  //turn on fan  
 }
+}
+
+//----------------------------------------Check Battery System Voltage---------------------------
+void CheckSystemBatteryMode()
+{
+if (Vin_Battery>= 35 && Vin_Battery <= 70) SystemBatteryMode=48;
+else if (Vin_Battery>=18 && Vin_Battery <=32) SystemBatteryMode=24;
+else if (Vin_Battery >=1 && Vin_Battery<= 16 ) SystemBatteryMode=12;
+else if(Vin_Battery==0) SystemBatteryMode=24;
+else SystemBatteryMode=24; // take it as default
+}
+//--------------------------------------Factory Settings--------------------------------------
+void factorySettings()
+{
+if (digitalRead(Up)==1 && digitalRead(Down)==1) 
+{
+EEPROM_FactorySettings();
+displayResetMessage=1;
+}
+}
+//------------------------------------EEPROM Factory Settings----------------------------------
+void EEPROM_FactorySettings()
+{
+if (SystemBatteryMode==12)
+{
+cutVoltage=12.5;
+Setpoint=14.0;
+
+}
+else if (SystemBatteryMode==24)
+{
+cutVoltage=25.0;
+Setpoint=27.4;
+} 
+else if (SystemBatteryMode==48)
+{
+cutVoltage=50;
+Setpoint=54.0;
+}
+else SystemBatteryMode=24;
+/* Global Varaiables */
+SolarMaxPower=50;
+PID_MaxHeatingValue=130;  // it is 50%
+SampleTimeInSeconds=5;   //samples of pid controller taked snapshots 
+UtilityMaxPower=100;     // max utility power 
+PID_MaxHeatingValueUtility=5;  // is is 100%
+DelayTime=1;   // delay time to start the heater 
+/*ً Save Values to EEPROM */
+EEPROM.put(0,cutVoltage); 
+EEPROM.put(4,Setpoint); 
+EEPROM.write(8,SolarMaxPower); 
+EEPROM.write(9,PID_MaxHeatingValue);
+EEPROM.write(10,SampleTimeInSeconds); 
+EEPROM.write(11,UtilityMaxPower); 
+EEPROM.write(12,PID_MaxHeatingValueUtility); 
+EEPROM.put(13,DelayTime); 
+EEPROM_Load();
 }
 //-----------------------------------------PRESS DETECT-----------------------------------------
 void Press_Detect()
@@ -803,5 +869,7 @@ void loop() {
    PID_Compute();
    CheckForGrid();   
    checkFan();
-   delay(100);
+   CheckSystemBatteryMode();   // to determine battery system mode 
+   factorySettings();
+   delay(500);
 }
