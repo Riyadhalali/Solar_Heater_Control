@@ -569,6 +569,8 @@ if (digitalRead(Down)==1)
 delay(100);
 SampleTimeInSeconds--;
 } 
+if(SampleTimeInSeconds > 60 ) SampleTimeInSeconds=0; 
+if(SampleTimeInSeconds < 0 )  SampleTimeInSeconds=0; 
 } // end while up and down
 } // end main while 
 EEPROM.write(10,SampleTimeInSeconds); 
