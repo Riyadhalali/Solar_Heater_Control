@@ -75,7 +75,12 @@ char secondsFan=0;
 char fanTime=60;  // fan time to turn off is 60 seconds 
 char SystemBatteryMode=0; // for checking the battery system  mode 
 char displayResetMessage=0;
-unsigned int esc=0;
+unsigned int esc=0;  
+double VinBatteryError=0.0;
+double VinBatteryDifference=0.0;
+char addError=0;
+float Vin_Battery_Calibrated=0.0;   // this is the reading voltage 
+
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
@@ -99,6 +104,7 @@ void Grid_Turn_Off();
 void checkFan();
 void CheckSystemBatteryMode();
 void EEPROM_FactorySettings();
+void SetCalibrationVoltage();
 //-------------------------------------------Functions---------------------------------------------- 
 void GPIO_Init()
 {
@@ -184,6 +190,9 @@ sum+=Battery[i];
 delay(100);
 } 
 Vin_Battery=sum/10.0;
+if (addError==1) Vin_Battery_Calibrated=Vin_Battery+VinBatteryDifference;
+else if(addError==0)  Vin_Battery_Calibrated=Vin_Battery-VinBatteryDifference;
+
 }
 //-------------------------------------Timer for updating screen reads--------------------------
 void Segment_Timer_Update ()
@@ -205,7 +214,7 @@ void Segment_Timer_Update ()
     ScreenTimer++;
     if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0)
     {
-    sevseg.setNumberF(Vin_Battery,1); // Displays '3.141'
+    sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
     sevseg.refreshDisplay();
     }
     if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0) 
@@ -247,6 +256,12 @@ void Segment_Timer_Update ()
     sevseg.refreshDisplay(); 
     } 
 
+    if(SetupProgramNumber==7)
+    {
+    sevseg.setChars("P07"); 
+    sevseg.refreshDisplay();  
+    }
+
 
     // displaying variables 
     if (SetupProgramNumber==10)    
@@ -284,14 +299,18 @@ void Segment_Timer_Update ()
     sevseg.setNumber(DelayTime);
     sevseg.refreshDisplay(); 
     } 
-
-
+    if (SetupProgramNumber==17)    
+    {
+    sevseg.setNumberF(VinBatteryError,1);
+    sevseg.refreshDisplay(); 
+    } 
+ 
     if (displayResetMessage==1)
     {
       sevseg.setChars("RST");
       sevseg.refreshDisplay();
       esc++; 
-      if (esc==50)
+      if (esc==500)
       {
         displayResetMessage=0;
         esc=0;
@@ -410,6 +429,8 @@ SetUtilityMaxPower();
 delay(500);
 SetDelayTime(); 
 delay(500);
+SetCalibrationVoltage();
+delay(500); 
 SetupProgramNumber=0; 
 insideSetup=0;
 }
@@ -627,6 +648,45 @@ if (DelayTime<0) DelayTime=0;
 EEPROM.put(13,DelayTime); 
 SecondsReadTime=0; 
 }
+
+//----------------------------------------SET BATTERY VOLTAGE CALIBRATION-----------------------
+void SetCalibrationVoltage()
+{
+delay(500) ; 
+while(digitalRead(Enter)==0 )
+{
+SetupProgramNumber=7;
+} 
+Read_Battery();
+VinBatteryError=Vin_Battery_Calibrated;
+delay(500); 
+while (digitalRead(Enter)==0 )
+{
+SetupProgramNumber=17;
+
+while (digitalRead(Up)==1 || digitalRead(Down)==1) 
+{
+if (digitalRead(Up)==1) 
+{
+delay(100);
+VinBatteryError+=0.1;
+}
+if (digitalRead(Down)==1) 
+{
+delay(100);
+VinBatteryError-=0.1;
+}
+if (VinBatteryError > 70.0  ) VinBatteryError=0;
+if (VinBatteryError<0) VinBatteryError=0;
+if (VinBatteryError>=Vin_Battery_Calibrated) addError=1;    // add
+if (VinBatteryError<Vin_Battery_Calibrated) addError=0;    // minus
+} // end while up and down
+}  // end while 
+//save to eeprom 
+VinBatteryDifference=fabs(VinBatteryError-Vin_Battery_Calibrated);
+EEPROM.write(15,addError);
+EEPROM.put(16,VinBatteryDifference);
+}  // end function 
 //-----------------------------------------EEPROM Load------------------------------------------
 void EEPROM_Load()
 {
@@ -640,6 +700,8 @@ SampleTimeInSeconds=EEPROM.read(10);
 UtilityMaxPower=EEPROM.read(11);
 PID_MaxHeatingValueUtility=EEPROM.read(12);
 EEPROM.get(13,DelayTime); 
+addError=EEPROM.read(15); 
+EEPROM.get(16,VinBatteryDifference);
 }
 //---------------------------------------CheckForParams-----------------------------------------
 void CheckForParams()
@@ -697,6 +759,19 @@ if (DelayTime<0 || DelayTime>=900 || isnan(DelayTime))
   EEPROM_Load();
 }
 
+ if (addError<0 || addError>1 || isnan(addError)) 
+{
+  addError=1;
+  EEPROM.write(15,addError); 
+  EEPROM_Load();
+}
+
+if (VinBatteryDifference<0 || VinBatteryDifference>=70 || isnan(VinBatteryDifference)) 
+{
+  VinBatteryDifference=0;
+  EEPROM.put(15,VinBatteryDifference); 
+  EEPROM_Load();
+}
 
 }
 //-----------------------------------------Check For Grid--------------------------------------
@@ -826,10 +901,12 @@ else SystemBatteryMode=24;
 /* Global Varaiables */
 SolarMaxPower=50;
 PID_MaxHeatingValue=130;  // it is 50%
-SampleTimeInSeconds=5;   //samples of pid controller taked snapshots 
+SampleTimeInSeconds=1;   //samples of pid controller taked snapshots 
 UtilityMaxPower=100;     // max utility power 
 PID_MaxHeatingValueUtility=5;  // is is 100%
-DelayTime=1;   // delay time to start the heater 
+DelayTime=1;   // delay time to start the heater
+addError=1; 
+VinBatteryDifference=0; 
 /*ً Save Values to EEPROM */
 EEPROM.put(0,cutVoltage); 
 EEPROM.put(4,Setpoint); 
@@ -839,16 +916,16 @@ EEPROM.write(10,SampleTimeInSeconds);
 EEPROM.write(11,UtilityMaxPower); 
 EEPROM.write(12,PID_MaxHeatingValueUtility); 
 EEPROM.put(13,DelayTime); 
+EEPROM.write(15,addError);
+EEPROM.put(16,VinBatteryDifference);
 EEPROM_Load();
 }
 //-----------------------------------------PRESS DETECT-----------------------------------------
 void Press_Detect()
 {
 InProgramMode=true; 
-digitalWrite(LED,HIGH);
 SetupProgram();
 delay(500);
-digitalWrite(LED,LOW);
 }
 
 //*****************************************MAIN LOOP********************************************
@@ -872,4 +949,4 @@ void loop() {
    CheckSystemBatteryMode();   // to determine battery system mode 
    factorySettings();
    delay(500);
-}
+}   // end of main ... 
