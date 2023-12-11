@@ -710,14 +710,18 @@ void CheckForParams()
 {
 if (cutVoltage<0 || cutVoltage>70 || isnan(cutVoltage) ) 
 {
-  cutVoltage=12.5;
+  if (SystemBatteryMode==12) cutVoltage=12.5;
+  if (SystemBatteryMode==24) cutVoltage=25.0; 
+  if (SystemBatteryMode==48) cutVoltage=50.0; 
   EEPROM.put(0,cutVoltage); 
   EEPROM_Load();
 }
 
 if (Setpoint<0 || Setpoint>70 || isnan(Setpoint) ) 
 {
-  Setpoint=14.5;
+  if (SystemBatteryMode==12) Setpoint=14.0;
+  if (SystemBatteryMode==24) Setpoint=27.2; 
+  if (SystemBatteryMode==48) Setpoint=54.0;
   EEPROM.put(4,Setpoint); 
   EEPROM_Load();
 }
