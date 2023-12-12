@@ -383,6 +383,7 @@ else  if (Vin_Battery<= cutVoltage)
   PID_Value=0; 
   PID_I=0; 
   PID_P=0;
+  TCCR1B=0x00 ; // stop the timer for no having any output so no output because i can't wait for interrupt to happen to turn off loads
   HeatingPower=map(PID_Value,0,PIDMaxValue,0,SolarMaxPower);
   PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260
   // we also can stop timer to make output zero but i have done it in interrupts 
