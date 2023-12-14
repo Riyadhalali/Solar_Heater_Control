@@ -131,7 +131,7 @@ CheckForGrid();
 //-----------------------------------------Interrupt-------------------------------------------
 void AC_Control()
 {
-if (Vin_Battery>=cutVoltage)
+if (Vin_Battery_Calibrated>=cutVoltage)
 {
 TCCR1B=0x04; //start timer with divide by 256 input
 TCNT1=0;
@@ -310,7 +310,7 @@ void Segment_Timer_Update ()
       sevseg.setChars("RST");
       sevseg.refreshDisplay();
       esc++; 
-      if (esc==500)
+      if (esc==2500)
       {
         displayResetMessage=0;
         esc=0;
@@ -331,7 +331,7 @@ void PID_Compute()
 if (digitalRead(AC_Available_Grid)==1) 
 {
   //-> for solar heating power 
-if(Vin_Battery>=cutVoltage)
+if(Vin_Battery_Calibrated>=cutVoltage)
 {
  currentMillis = millis();
 if (currentMillis - previousMillis >= 1000)  // encrement variable every second 
@@ -347,7 +347,7 @@ timeChange = (double)(now - lastTime);
 if (timeChange >= SampleTimeInSeconds*1000)
 {
  // calculate error 
-PID_Error=Vin_Battery-Setpoint; 
+PID_Error=Vin_Battery_Calibrated-Setpoint; 
  //calculate the p value 
 PID_P=Kp*PID_Error; 
 if (PID_P <0) PID_P=0;
@@ -378,7 +378,7 @@ lastTime=now;  // save last time for sampling time
 } // end if sample time 
 }  //end if vin_battery 
 
-else  if (Vin_Battery<= cutVoltage)
+else  if (Vin_Battery_Calibrated<= cutVoltage)
 {
   PID_Value=0; 
   PID_I=0; 
@@ -776,7 +776,7 @@ if (DelayTime<0 || DelayTime>=900 || isnan(DelayTime))
 if (VinBatteryDifference<0 || VinBatteryDifference>=70 || isnan(VinBatteryDifference)) 
 {
   VinBatteryDifference=0;
-  EEPROM.put(15,VinBatteryDifference); 
+  EEPROM.put(16,VinBatteryDifference); 
   EEPROM_Load();
 }
 
@@ -870,7 +870,7 @@ if (PWM_Value>0 && PWM_Value <255)
 //----------------------------------------Check Battery System Voltage---------------------------
 void CheckSystemBatteryMode()
 {
-if (Vin_Battery>= 35 && Vin_Battery <= 70) SystemBatteryMode=48;
+if      (Vin_Battery>= 35 && Vin_Battery <= 70) SystemBatteryMode=48;
 else if (Vin_Battery>=18 && Vin_Battery <=32) SystemBatteryMode=24;
 else if (Vin_Battery >=1 && Vin_Battery<= 16 ) SystemBatteryMode=12;
 else if(Vin_Battery==0) SystemBatteryMode=24;
