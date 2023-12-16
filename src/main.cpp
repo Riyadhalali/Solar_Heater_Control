@@ -105,6 +105,7 @@ void checkFan();
 void CheckSystemBatteryMode();
 void EEPROM_FactorySettings();
 void SetCalibrationVoltage();
+void WelcomeScreen();
 //-------------------------------------------Functions---------------------------------------------- 
 void GPIO_Init()
 {
@@ -136,19 +137,24 @@ if (Vin_Battery_Calibrated>=cutVoltage)
 TCCR1B=0x04; //start timer with divide by 256 input
 TCNT1=0;
 }
-else 
+else  if (Vin_Battery_Calibrated<=cutVoltage)
 {
  TCCR1B=0x00 ; // stop the timer for no having any output 
  PID_Value=0; 
+ PID_I=0;
+ PID_P=0;
 }
 
+
+//-> Making range of pwm_value and it must not be zero
 if (PWM_Value>=255 )  TCCR1B=0x00 ; // stop the timer for no having any output 
 else if(PWM_Value<255 ) 
 {
-TCCR1B=0x04; //start timer with divide by 256 input
+//-> check that range of PWM_value is between 1 and 255
+if (PWM_Value==0) PWM_Value=1; // can't be zero because it will give max value 
 OCR1A=PWM_Value;
 }
-//CheckForGrid();
+
 }
 ISR(TIMER1_COMPA_vect)
 { //comparator match
@@ -219,7 +225,7 @@ void Segment_Timer_Update ()
     }
     if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0) 
     {
-    sevseg.setNumber(HeatingPower); // Displays '3.141' 
+    sevseg.setNumber(PWM_Value); // Displays '3.141' 
     sevseg.refreshDisplay(); 
     }  
 
@@ -378,7 +384,7 @@ lastTime=now;  // save last time for sampling time
 } // end if sample time 
 }  //end if vin_battery 
 
-else  if (Vin_Battery_Calibrated<= cutVoltage)
+else  if (Vin_Battery_Calibrated <= cutVoltage)
 {
   PID_Value=0; 
   PID_I=0; 
@@ -540,7 +546,7 @@ EEPROM.write(9,PID_MaxHeatingValue); // for solar this value
 PID_Value=0; 
 PID_I=0; 
 PID_P=0; 
-PWM_Value=0;
+//PWM_Value=0;
 }
 //-----------------------------------------Sampling time-----------------------------------------
 void Sample_Timing()
@@ -614,7 +620,7 @@ EEPROM.write(12,PID_MaxHeatingValueUtility); // for solar this value
 PID_Value=0; 
 PID_I=0; 
 PID_P=0; 
-PWM_Value=0;
+//PWM_Value=0;
 }
 //-----------------------------------------SetDelayTime----------------------------------------
 void SetDelayTime()
@@ -823,7 +829,7 @@ LoadsAlreadySwitchOff=1;
 PID_Value=0; 
 PID_I=0; 
 PID_P=0;
-PWM_Value=0;
+//PWM_Value=0;
 HeatingPower=0;
 SecondsReadTime=0;
 digitalWrite(Contactor,1);   // TURN ON CONTACTOR
@@ -835,7 +841,7 @@ LoadsAlreadySwitchOff=0;
 PID_Value=0; 
 PID_I=0; 
 PID_P=0;
-PWM_Value=0;
+//PWM_Value=0;
 HeatingPower=0;
 SecondsReadTime=0;
 digitalWrite(Contactor,0);  // TURN OFF CONTACTOR
@@ -934,11 +940,34 @@ InProgramMode=true;
 SetupProgram();
 delay(500);
 }
+//---------------------------------------WELCOME SCREEN-----------------------------------------
+void WelcomeScreen()
+{
+char esc=0;
+while(esc!= 255)
+{
+esc++;
+sevseg.setChars("SHC");
+sevseg.refreshDisplay();
+}
+esc=0;
+delay(200);
+while (esc!=255)
+{
+esc++;
+sevseg.setChars("1.0");
+sevseg.refreshDisplay();
+}
+esc=0;
+delay(200);
+
+}
 
 //*****************************************MAIN LOOP********************************************
 void setup() {
   // put your setup code here, to run once:
 Segment_Init();
+//WelcomeScreen();
 Segment_Timer_Update();
 GPIO_Init();  
 EEPROM_Load();
