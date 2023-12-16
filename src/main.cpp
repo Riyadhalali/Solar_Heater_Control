@@ -80,7 +80,7 @@ double VinBatteryError=0.0;
 double VinBatteryDifference=0.0;
 char addError=0;
 float Vin_Battery_Calibrated=0.0;   // this is the reading voltage 
-
+char displayWelcomeScreen=0,displayVersionNumber=0;
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
@@ -218,13 +218,13 @@ void Segment_Timer_Update ()
     TCNT2=0;    // very important 
     
     ScreenTimer++;
-    if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0)
+    if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0)
     {
     sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
     //sevseg.setNumber(PWM_Value); // Displays '3.141' 
     sevseg.refreshDisplay();
     }
-    if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0) 
+    if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0) 
     {
     sevseg.setNumber(HeatingPower); // Displays '3.141' 
     sevseg.refreshDisplay(); 
@@ -323,7 +323,32 @@ void Segment_Timer_Update ()
         esc=0;
       }
     }
+//***************************************WElcome Screen**********************************************
+    if (displayWelcomeScreen==1)
+    {
+      sevseg.setChars("SHC");
+      sevseg.refreshDisplay();
+       esc++; 
+      if (esc==1500)
+      {
+        displayWelcomeScreen=0;
+        esc=0;
+        displayVersionNumber=1;
+      }
+    }
 
+     if (displayVersionNumber==1)
+    {
+      sevseg.setChars("V1.0");
+      sevseg.refreshDisplay();
+       esc++; 
+      if (esc==1500)
+      {
+        displayVersionNumber=0;
+        esc=0;
+      }
+    }
+//------------------------------------------------END OF WELECOME SCREEN-----------------------------------------
   if (ScreenTimer > 7000) ScreenTimer=0; 
 
  
@@ -944,31 +969,15 @@ delay(500);
 //---------------------------------------WELCOME SCREEN-----------------------------------------
 void WelcomeScreen()
 {
-char esc=0;
-while(esc!= 255)
-{
-esc++;
-sevseg.setChars("SHC");
-sevseg.refreshDisplay();
-}
-esc=0;
-delay(200);
-while (esc!=255)
-{
-esc++;
-sevseg.setChars("1.0");
-sevseg.refreshDisplay();
-}
-esc=0;
-delay(200);
 
+displayWelcomeScreen=1;
 }
 
 //*****************************************MAIN LOOP********************************************
 void setup() {
   // put your setup code here, to run once:
 Segment_Init();
-//WelcomeScreen();
+WelcomeScreen();
 Segment_Timer_Update();
 GPIO_Init();  
 EEPROM_Load();
