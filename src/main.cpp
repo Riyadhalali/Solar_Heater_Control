@@ -220,13 +220,13 @@ void Segment_Timer_Update ()
     ScreenTimer++;
     if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0)
     {
-    //sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
-    sevseg.setNumber(PWM_Value); // Displays '3.141' 
+    sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
+    //sevseg.setNumber(PWM_Value); // Displays '3.141' 
     sevseg.refreshDisplay();
     }
     if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0) 
     {
-    sevseg.setNumber(PWM_Value); // Displays '3.141' 
+    sevseg.setNumber(HeatingPower); // Displays '3.141' 
     sevseg.refreshDisplay(); 
     }  
 
