@@ -54,7 +54,7 @@ float PID_MaxHeatingValue;
 float PID_MaxHeatingValueUtility;
 unsigned long lastTime;// for timing in PID controller 
 int SampleTimeInSeconds=0;
-int PWM_Value;
+int PWM_Value=255;
 unsigned long longPressTime = 500; // Duration of a long press in milliseconds
 boolean loopRunning = false; // Flag indicating whether the loop is running
 bool InProgramMode=false; 
@@ -220,7 +220,8 @@ void Segment_Timer_Update ()
     ScreenTimer++;
     if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0)
     {
-    sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
+    //sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
+    sevseg.setNumber(PWM_Value); // Displays '3.141' 
     sevseg.refreshDisplay();
     }
     if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0) 
@@ -546,7 +547,7 @@ EEPROM.write(9,PID_MaxHeatingValue); // for solar this value
 PID_Value=0; 
 PID_I=0; 
 PID_P=0; 
-//PWM_Value=0;
+PWM_Value=255;
 }
 //-----------------------------------------Sampling time-----------------------------------------
 void Sample_Timing()
@@ -620,7 +621,7 @@ EEPROM.write(12,PID_MaxHeatingValueUtility); // for solar this value
 PID_Value=0; 
 PID_I=0; 
 PID_P=0; 
-//PWM_Value=0;
+PWM_Value=255;
 }
 //-----------------------------------------SetDelayTime----------------------------------------
 void SetDelayTime()
@@ -829,7 +830,7 @@ LoadsAlreadySwitchOff=1;
 PID_Value=0; 
 PID_I=0; 
 PID_P=0;
-//PWM_Value=0;
+PWM_Value=255;
 HeatingPower=0;
 SecondsReadTime=0;
 digitalWrite(Contactor,1);   // TURN ON CONTACTOR
@@ -841,7 +842,7 @@ LoadsAlreadySwitchOff=0;
 PID_Value=0; 
 PID_I=0; 
 PID_P=0;
-//PWM_Value=0;
+PWM_Value=255;
 HeatingPower=0;
 SecondsReadTime=0;
 digitalWrite(Contactor,0);  // TURN OFF CONTACTOR
