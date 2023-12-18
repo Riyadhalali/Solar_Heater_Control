@@ -20,7 +20,7 @@ SevSeg sevseg; //Instantiate a seven segment object
 #define Down 0
 #define PWM 9	
 #define PULSE 4  //trigger pulse width (counts)
-#define OCR1A_MaxValue 255
+#define OCR1A_MaxValue 225
 #define PIDMaxValue 100 // pid value just for selecting the max range 
 #define Fan A4
 #define Contactor 8
@@ -39,7 +39,7 @@ char txt[32];
 //Define Variables we'll be connecting to
 double Setpoint, Input, Output; // set point is the desired value for heating 
 //Specify the links and initial tuning parameters
-double Kp=1,Ki=1,Kd=0;
+double Kp=2,Ki=1,Kd=0;
 uint16_t ScreenTimer=0;
 float cutVoltage=0;
 double PID_Value,PID_P,PID_I,PID_Error;
@@ -54,7 +54,7 @@ float PID_MaxHeatingValue;
 float PID_MaxHeatingValueUtility;
 unsigned long lastTime;// for timing in PID controller 
 int SampleTimeInSeconds=0;
-int PWM_Value=255;
+int PWM_Value=OCR1A_MaxValue;   // start value 
 unsigned long longPressTime = 500; // Duration of a long press in milliseconds
 boolean loopRunning = false; // Flag indicating whether the loop is running
 bool InProgramMode=false; 
@@ -132,12 +132,12 @@ CheckForGrid();
 //-----------------------------------------Interrupt-------------------------------------------
 void AC_Control()
 {
-if (Vin_Battery_Calibrated>=cutVoltage)
+if (Vin_Battery_Calibrated>cutVoltage)
 {
 TCCR1B=0x04; //start timer with divide by 256 input
 TCNT1=0;
 }
-else  if (Vin_Battery_Calibrated<=cutVoltage)
+else  if (Vin_Battery_Calibrated<cutVoltage)
 {
  TCCR1B=0x00 ; // stop the timer for no having any output 
  PID_Value=0; 
@@ -147,11 +147,11 @@ else  if (Vin_Battery_Calibrated<=cutVoltage)
 
 
 //-> Making range of pwm_value and it must not be zero
-if (PWM_Value>=255 )  TCCR1B=0x00 ; // stop the timer for no having any output 
-else if(PWM_Value<255 ) 
+if (PWM_Value>=OCR1A_MaxValue )  TCCR1B=0x00 ; // stop the timer for no having any output 
+else if(PWM_Value<OCR1A_MaxValue ) 
 {
 //-> check that range of PWM_value is between 1 and 255
-if (PWM_Value==0) PWM_Value=1; // can't be zero because it will give max value 
+if (PWM_Value==0) PWM_Value=1; // can't be zero because it will give sto the output 
 OCR1A=PWM_Value;
 }
 
@@ -363,7 +363,7 @@ void PID_Compute()
 if (digitalRead(AC_Available_Grid)==1) 
 {
   //-> for solar heating power 
-if(Vin_Battery_Calibrated>=cutVoltage)
+if(Vin_Battery_Calibrated>cutVoltage)
 {
  currentMillis = millis();
 if (currentMillis - previousMillis >= 1000)  // encrement variable every second 
@@ -404,13 +404,13 @@ AS FROM TESTING :
 best value was 260 or lower so load can be still on when the heating power is zero 
  */
 HeatingPower=map(PID_Value,0,PIDMaxValue,0,SolarMaxPower); // map pid value show the range between 1- 260 what is the power 
-PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260 
+PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 255 decfined in ocr1a_maxvalue
 lastTime=now;  // save last time for sampling time 
 } // end if sample 
 } // end if sample time 
 }  //end if vin_battery 
 
-else  if (Vin_Battery_Calibrated <= cutVoltage)
+else  if (Vin_Battery_Calibrated < cutVoltage)
 {
   PID_Value=0; 
   PID_I=0; 
@@ -572,7 +572,7 @@ EEPROM.write(9,PID_MaxHeatingValue); // for solar this value
 PID_Value=0; 
 PID_I=0; 
 PID_P=0; 
-PWM_Value=255;
+PWM_Value=OCR1A_MaxValue;
 }
 //-----------------------------------------Sampling time-----------------------------------------
 void Sample_Timing()
@@ -646,7 +646,7 @@ EEPROM.write(12,PID_MaxHeatingValueUtility); // for solar this value
 PID_Value=0; 
 PID_I=0; 
 PID_P=0; 
-PWM_Value=255;
+PWM_Value=OCR1A_MaxValue;
 }
 //-----------------------------------------SetDelayTime----------------------------------------
 void SetDelayTime()
@@ -753,7 +753,7 @@ if (cutVoltage<0 || cutVoltage>70 || isnan(cutVoltage) )
 if (Setpoint<0 || Setpoint>70 || isnan(Setpoint) ) 
 {
   if (SystemBatteryMode==12) Setpoint=14.0;
-  if (SystemBatteryMode==24) Setpoint=27.2; 
+  if (SystemBatteryMode==24) Setpoint=27.4; 
   if (SystemBatteryMode==48) Setpoint=54.0;
   EEPROM.put(4,Setpoint); 
   EEPROM_Load();
@@ -855,7 +855,7 @@ LoadsAlreadySwitchOff=1;
 PID_Value=0; 
 PID_I=0; 
 PID_P=0;
-PWM_Value=255;
+PWM_Value=OCR1A_MaxValue;  // to zero output 
 HeatingPower=0;
 SecondsReadTime=0;
 digitalWrite(Contactor,1);   // TURN ON CONTACTOR
@@ -867,7 +867,7 @@ LoadsAlreadySwitchOff=0;
 PID_Value=0; 
 PID_I=0; 
 PID_P=0;
-PWM_Value=255;
+PWM_Value=OCR1A_MaxValue;
 HeatingPower=0;
 SecondsReadTime=0;
 digitalWrite(Contactor,0);  // TURN OFF CONTACTOR
@@ -877,7 +877,7 @@ digitalWrite(Contactor,0);  // TURN OFF CONTACTOR
 void checkFan()
 { 
 
-if (PWM_Value>=255)
+if (PWM_Value>=OCR1A_MaxValue)
 { 
 fanState=0;                // heating is off make this variable off and turn fan after 60 seconds
 currentMillisFan=millis();
@@ -892,7 +892,7 @@ if (secondsFan>=fanTime)
   secondsFan=0;
 }
 }  
-if (PWM_Value>0 && PWM_Value <255)
+if (PWM_Value>0 && PWM_Value <OCR1A_MaxValue)
 { 
   fanState=1; //heating is on so fan must turn on 
   digitalWrite(Fan,HIGH);  //turn on fan  
@@ -943,7 +943,7 @@ PID_MaxHeatingValue=130;  // it is 50%
 SampleTimeInSeconds=1;   //samples of pid controller taked snapshots 
 UtilityMaxPower=100;     // max utility power 
 PID_MaxHeatingValueUtility=5;  // is is 100%
-DelayTime=1;   // delay time to start the heater
+DelayTime=10;   // delay time to start the heater
 addError=1; 
 VinBatteryDifference=0; 
 /*ً Save Values to EEPROM */
