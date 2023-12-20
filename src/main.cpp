@@ -208,7 +208,7 @@ void Segment_Timer_Update ()
  TCCR2B|= (1<<WGM21);   //choosing compare output mode for timer 2
  TCCR2B|= (1<<CS22) | (1 <<CS21 ) ;    //choosing 1024 prescalar so we can get 1 ms delay for updating Dipslay
  TIMSK2 |= (1<<OCIE2A);     //enabling interrupt
- OCR2A=40;
+ OCR2A=20;
  }
  
  ISR(TIMER2_COMPA_vect) 
@@ -218,16 +218,32 @@ void Segment_Timer_Update ()
     TCNT2=0;    // very important 
     
     ScreenTimer++;
-    if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0)
+    if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
+    )
     {
     sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
     //sevseg.setNumber(PWM_Value); // Displays '3.141' 
     sevseg.refreshDisplay();
     }
-    if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0) 
+    if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
+    ) 
     {
     sevseg.setNumber(HeatingPower); // Displays '3.141' 
     sevseg.refreshDisplay(); 
+    }  
+
+   if (ScreenTimer>7000 && ScreenTimer< 9000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
+   ) 
+    {
+      if (digitalRead(AC_Available_Grid)==0)
+      {
+    sevseg.setChars("GON");
+    sevseg.refreshDisplay();
+      } else 
+      {
+       sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
+       sevseg.refreshDisplay();
+      }
     }  
 
     if (SetupProgramNumber==1) 
@@ -349,7 +365,9 @@ void Segment_Timer_Update ()
       }
     }
 //------------------------------------------------END OF WELECOME SCREEN-----------------------------------------
-  if (ScreenTimer > 7000) ScreenTimer=0; 
+ 
+  
+  if (ScreenTimer > 9000) ScreenTimer=0; 
 
  
 
@@ -497,6 +515,8 @@ if (digitalRead(Down)==1)
 delay(100);
 cutVoltage-=0.1;
 }
+if(cutVoltage>60) cutVoltage=0;
+if(cutVoltage<0)  cutVoltage=0;
 } // end while up and down 
 }  // end while enter 
 EEPROM.put(0,cutVoltage);
@@ -530,6 +550,8 @@ delay(100);
 Setpoint-=0.1;
 }
 } // end while up and down 
+if(Setpoint>60) Setpoint=0;
+if(Setpoint<0)  Setpoint=0;
 }  // end while enter 
 EEPROM.put(4,Setpoint);
 }
