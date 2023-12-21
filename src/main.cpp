@@ -215,7 +215,6 @@ void Segment_Timer_Update ()
   
     
     TCNT2=0;    // very important 
-    
     ScreenTimer++;
     if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
     )
@@ -235,8 +234,8 @@ void Segment_Timer_Update ()
     {
       if (digitalRead(AC_Available_Grid)==0)
       {
-    sevseg.setChars("GON");
-    sevseg.refreshDisplay();
+      sevseg.setChars("GON");
+      sevseg.refreshDisplay();
       } else 
       {
        sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
@@ -363,25 +362,17 @@ void Segment_Timer_Update ()
       }
     }
 //------------------------------------------------END OF WELECOME SCREEN-----------------------------------------
- 
-  
-  if (ScreenTimer > 9000) ScreenTimer=0; 
-
- 
-
+if (ScreenTimer > 9000) ScreenTimer=0; 
  }
 //---------------------------------------------------------------------------------
-
-
-
 void PID_Compute()
 {
 if (digitalRead(AC_Available_Grid)==1) 
 {
-  //-> for solar heating power 
+//-> for solar heating power 
 if(Vin_Battery_Calibrated>cutVoltage)
 {
- currentMillis = millis();
+currentMillis = millis();
 if (currentMillis - previousMillis >= 1000)  // encrement variable every second 
 {
 previousMillis = currentMillis;
@@ -879,7 +870,6 @@ PWM_Value=OCR1A_MaxValue;  // to zero output
 HeatingPower=0;
 SecondsReadTime=0;
 digitalWrite(Contactor,1);   // TURN ON CONTACTOR
-
 } 
 else if (digitalRead(AC_Available_Grid)==1 && LoadsAlreadySwitchOff==1 )
 {
@@ -924,7 +914,7 @@ void CheckSystemBatteryMode()
 {
 if      (Vin_Battery>= 35 && Vin_Battery <= 70) SystemBatteryMode=48;
 else if (Vin_Battery>=18 && Vin_Battery <=32) SystemBatteryMode=24;
-else if (Vin_Battery >=1 && Vin_Battery<= 16 ) SystemBatteryMode=12;
+else if (Vin_Battery >=1 && Vin_Battery<= 17 ) SystemBatteryMode=12;
 else if(Vin_Battery==0) SystemBatteryMode=24;
 else SystemBatteryMode=24; // take it as default
 }
