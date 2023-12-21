@@ -789,7 +789,7 @@ if (SolarMaxPower<0 || SolarMaxPower>100 || isnan(SolarMaxPower))
 }
 if (PID_MaxHeatingValue<0 || PID_MaxHeatingValue>=OCR1A_MaxValue || isnan(PID_MaxHeatingValue)) 
 {
-  PID_MaxHeatingValue=0;
+  PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 100 )
   EEPROM.write(9,PID_MaxHeatingValue); 
   EEPROM_Load();
 }
@@ -808,7 +808,7 @@ if (UtilityMaxPower<0 || UtilityMaxPower>100 || isnan(UtilityMaxPower))
 
 if (PID_MaxHeatingValueUtility<0 || PID_MaxHeatingValueUtility>=OCR1A_MaxValue || isnan(PID_MaxHeatingValueUtility)) 
 {
-  PID_MaxHeatingValueUtility=0;
+  PID_MaxHeatingValueUtility=OCR1A_MaxValue - ( 2.5 * UtilityMaxPower);  // (2.5 = 255 / 100 )
   EEPROM.write(12,PID_MaxHeatingValueUtility); 
   EEPROM_Load();
 }
