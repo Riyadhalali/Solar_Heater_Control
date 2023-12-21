@@ -21,7 +21,7 @@ SevSeg sevseg; //Instantiate a seven segment object
 #define PWM 9	
 #define PULSE 4  //trigger pulse width (counts)
 #define OCR1A_MaxValue 225
-#define PIDMaxValue 100 // pid value just for selecting the max range 
+#define PIDMaxValue 225 // pid value just for selecting the max range 
 #define Fan A4
 #define Contactor 8
 
@@ -123,13 +123,12 @@ attachInterrupt(digitalPinToInterrupt(3),Grid_Turn_Off,RISING);
 button.setLongPressIntervalMs(100);
 button.attachLongPressStart(Press_Detect); // Attach a function to the long press stop event
 }
-
 //-----------------------------------------Grid Switch Off-------------------------------------
 void Grid_Turn_Off()
 {
 CheckForGrid();
 }
-//-----------------------------------------Interrupt-------------------------------------------
+//--------------------------------------------Interrupt-------------------------------------------
 void AC_Control()
 {
 if (Vin_Battery_Calibrated>cutVoltage)
@@ -187,13 +186,13 @@ void Read_Battery()
 {
 unsigned char i=0;
 float sum=0 , Battery[10];
-for (  i=0; i<10 ; i++)
+for (  i=0; i<100 ; i++)
 {
 ADC_Value=analogRead(A3);
 Battery_Voltage=(ADC_Value *5.0)/1024.0;
 Battery[i]=((10.5/0.5)*Battery_Voltage);
 sum+=Battery[i];
-delay(100);
+delay(10);
 } 
 Vin_Battery=sum/10.0;
 if (addError==1) Vin_Battery_Calibrated=Vin_Battery+VinBatteryDifference;
@@ -222,7 +221,6 @@ void Segment_Timer_Update ()
     )
     {
     sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
-    //sevseg.setNumber(PWM_Value); // Displays '3.141' 
     sevseg.refreshDisplay();
     }
     if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
@@ -401,16 +399,16 @@ PID_Error=Vin_Battery_Calibrated-Setpoint;
  //calculate the p value 
 PID_P=Kp*PID_Error; 
 if (PID_P <0) PID_P=0;
-if (PID_P > 100) PID_P=100; 
+if (PID_P > PIDMaxValue) PID_P=PIDMaxValue; 
 // calculate the I controller 
 PID_I=PID_I+ (Ki*PID_Error);
 if (PID_I <0) PID_I=0;
-if (PID_I > 100) PID_I=100; 
+if (PID_I > PIDMaxValue) PID_I=PIDMaxValue; 
 // calcaulte the pid value final 
 PID_Value=PID_P+PID_I ; 
 // to make range of pid 
 if (PID_Value <0) PID_Value=0;
-if (PID_Value > 100) PID_Value=100; 
+if (PID_Value > PIDMaxValue) PID_Value=PIDMaxValue; 
 /*
 Calculation method:
 Solar Max Power : 40 % 
