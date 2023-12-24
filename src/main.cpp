@@ -208,7 +208,7 @@ Battery[i]=((10.5/0.5)*Battery_Voltage);
 sum+=Battery[i];
 delay(10);
 } 
-Vin_Battery=sum/10.0;
+Vin_Battery=sum/100.0;
 if (addError==1) Vin_Battery_Calibrated=Vin_Battery+VinBatteryDifference;
 else if(addError==0)  Vin_Battery_Calibrated=Vin_Battery-VinBatteryDifference;
 
@@ -790,7 +790,7 @@ if (Setpoint<0 || Setpoint>70 || isnan(Setpoint) )
 
 if (SolarMaxPower<0 || SolarMaxPower>100 || isnan(SolarMaxPower)) 
 {
-  SolarMaxPower=50;
+  SolarMaxPower=75;
   EEPROM.write(8,SolarMaxPower); 
   EEPROM_Load();
 }
@@ -968,12 +968,10 @@ Setpoint=54.0;
 }
 else SystemBatteryMode=24;
 /* Global Varaiables */
-SolarMaxPower=100;
-//PID_MaxHeatingValue=130;
+SolarMaxPower=75;
 PID_MaxHeatingValue=OCR1A_MaxValue -  (OCR1A_MaxValue * SolarMaxPower) /100.0;  // old equation was : PID_MaxHeatingValue=OCR1A_MaxValue - ( (OCR1A_MaxValue/100) * SolarMaxPower);
 SampleTimeInSeconds=1;   //samples of pid controller taked snapshots 
 UtilityMaxPower=100;     // max utility power 
-//PID_MaxHeatingValueUtility=1;
 PID_MaxHeatingValueUtility=OCR1A_MaxValue - ( OCR1A_MaxValue * UtilityMaxPower) /100.0;  // (2.5 = 255 / 100 )
 DelayTime=1;   // delay time to start the heater
 addError=1; 
@@ -1001,7 +999,6 @@ delay(500);
 //---------------------------------------WELCOME SCREEN-----------------------------------------
 void WelcomeScreen()
 {
-
 displayWelcomeScreen=1;
 }
 
