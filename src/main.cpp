@@ -529,7 +529,7 @@ if (digitalRead(Down)==1)
 delay(100);
 cutVoltage-=0.1;
 }
-if(cutVoltage>60) cutVoltage=0;
+if(cutVoltage>60) cutVoltage=60.0;
 if(cutVoltage<0)  cutVoltage=0;
 } // end while up and down 
 }  // end while enter 
@@ -564,7 +564,7 @@ delay(100);
 Setpoint-=0.1;
 }
 } // end while up and down 
-if(Setpoint>60) Setpoint=0;
+if(Setpoint>60.0) Setpoint=60.0;
 if(Setpoint<0)  Setpoint=0;
 }  // end while enter 
 EEPROM.put(4,Setpoint);
@@ -597,7 +597,7 @@ if (digitalRead(Down)==1)
 delay(100);
 SolarMaxPower--;
 }
-if (SolarMaxPower>100)  SolarMaxPower=0;
+if (SolarMaxPower>100)  SolarMaxPower=100;
 if (SolarMaxPower<0) SolarMaxPower=0;
 } // end while up and down
 }  // end main while 
@@ -638,7 +638,7 @@ if (digitalRead(Down)==1)
 delay(100);
 SampleTimeInSeconds--;
 } 
-if(SampleTimeInSeconds > 60 ) SampleTimeInSeconds=0; 
+if(SampleTimeInSeconds > 60 ) SampleTimeInSeconds=60; 
 if(SampleTimeInSeconds < 0 )  SampleTimeInSeconds=0; 
 } // end while up and down
 } // end main while 
@@ -672,7 +672,7 @@ if (digitalRead(Down)==1)
 delay(100);
 UtilityMaxPower--;
 }
-if (UtilityMaxPower>100)  UtilityMaxPower=0;
+if (UtilityMaxPower>100)  UtilityMaxPower=100;
 if (UtilityMaxPower<0) UtilityMaxPower=0;
 } // end while up and down
 }  // end main while 
@@ -712,7 +712,7 @@ if (digitalRead(Down)==1)
 delay(100);
 DelayTime--;
 }
-if (DelayTime>900)  DelayTime=0;
+if (DelayTime>900)  DelayTime=900;
 if (DelayTime<0) DelayTime=0;
 } // end while up and down
 }  // end main while 
@@ -747,7 +747,7 @@ if (digitalRead(Down)==1)
 delay(100);
 VinBatteryError-=0.1;
 }
-if (VinBatteryError > 70.0  ) VinBatteryError=0;
+if (VinBatteryError > 70.0  ) VinBatteryError=70.0;
 if (VinBatteryError<0) VinBatteryError=0;
 if (VinBatteryError>=Vin_Battery_Calibrated) addError=1;    // add
 if (VinBatteryError<Vin_Battery_Calibrated) addError=0;    // minus
