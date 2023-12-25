@@ -891,8 +891,8 @@ LoadsAlreadySwitchOff=1;
 PID_Value=0; 
 PID_I=0; 
 PID_P=0;
-PWM_Value=OCR1A_MaxValue;  // to zero output 
 TCCR1B=0x00; // turn off 
+digitalWrite(PWM,LOW);
 HeatingPower=0;
 SecondsReadTime=0;
 digitalWrite(Contactor,1);   // TURN ON CONTACTOR
@@ -903,8 +903,8 @@ LoadsAlreadySwitchOff=0;
 PID_Value=0; 
 PID_I=0; 
 PID_P=0;
-PWM_Value=OCR1A_MaxValue;
 TCCR1B=0x00; // turn off 
+digitalWrite(PWM,LOW);
 HeatingPower=0;
 SecondsReadTime=0;
 digitalWrite(Contactor,0);  // TURN OFF CONTACTOR
