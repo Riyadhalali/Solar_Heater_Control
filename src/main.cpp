@@ -1010,8 +1010,19 @@ displayWelcomeScreen=1;
 //-------------------------------------CHECK FOR LOW CUT OFF----------------------------------
 void checkCutOffVoltage()
 {
+if(digitalRead(AC_Available_Grid)==1)
+{
 
+ if (Vin_Battery_Calibrated<=cutVoltage)
+ {
+  PID_Value=0; 
+  PID_I=0; 
+  PID_P=0;
+  digitalWrite(PWM,LOW) ; 
+  TCCR1B=0x00;
+ }
 
+}
 
 }
 //*****************************************MAIN LOOP********************************************
@@ -1035,5 +1046,6 @@ void loop() {
    checkFan();
    CheckSystemBatteryMode();   // to determine battery system mode 
    factorySettings();
+   checkCutOffVoltage(); // to make sure all is off when battery voltage is down
    delay(500);
 }   // end of main ... 
