@@ -20,8 +20,8 @@ SevSeg sevseg; //Instantiate a seven segment object
 #define Down 0
 #define PWM 9	
 #define PULSE 4  //trigger pulse width (counts)
-#define OCR1A_MaxValue 225
-#define PIDMaxValue 225 // pid  value just for selecting the max range 
+#define OCR1A_MaxValue 254
+#define PIDMaxValue 254 // pid  value just for selecting the max range 
 #define Fan A4
 #define Contactor 8
 
@@ -139,7 +139,7 @@ if (digitalRead(AC_Available_Grid)==1)
 if (Vin_Battery_Calibrated>cutVoltage )
 {
 TCCR1B=0x04; //start timer with divide by 256 input
-TCNT1=0;
+TCNT1=0;   // very important to make overflow for switching 
 }
 else  if (Vin_Battery_Calibrated<=cutVoltage)
 {
@@ -167,6 +167,7 @@ else if (digitalRead(AC_Available_Grid)==0)
 TCCR1B=0x04; //start timer with divide by 256 input
 TCNT1=0; 
 //-> check that range of PWM_value is between 1 and 255
+
 if (PWM_Value==0) PWM_Value=1; // can't be zero because it will give sto the output 
 OCR1A=PWM_Value;
  } // end if second time
@@ -175,14 +176,15 @@ OCR1A=PWM_Value;
 }  // end function 
 //---------------------------------END INTERRUPT------------------------------------
 ISR(TIMER1_COMPA_vect)
-{ //comparator match
-   digitalWrite(PWM,HIGH);  //set TRIAC gate to high
-   TCNT1 = 65536-PULSE;      //trigger pulse width
+{ 
+  //comparator match
+   digitalWrite(PWM,HIGH);    //set TRIAC gate to high
+   TCNT1 = 65536-PULSE;       //trigger pulse width
 }
 
-ISR(TIMER1_OVF_vect){ //timer1 overflow
-  digitalWrite(PWM,LOW); //turn off TRIAC gate
-  TCCR1B = 0x00;          //disable timer stopd unintended triggers
+ISR(TIMER1_OVF_vect){       //timer1 overflow
+  digitalWrite(PWM,LOW);    //turn off TRIAC gate
+  TCCR1B = 0x00;            //disable timer stopd unintended triggers
 }
 
 //----------------------------------------7 Segment Init----------------------------------------
@@ -951,6 +953,7 @@ if (digitalRead(Up)==1 && digitalRead(Down)==1)
 EEPROM_FactorySettings();
 displayResetMessage=1;
 }
+
 }
 //------------------------------------EEPROM Factory Settings----------------------------------
 void EEPROM_FactorySettings()
