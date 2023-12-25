@@ -21,7 +21,7 @@ SevSeg sevseg; //Instantiate a seven segment object
 #define PWM 9	
 #define PULSE 4  //trigger pulse width (counts)
 #define OCR1A_MaxValue 225
-#define PIDMaxValue 225 // pid value just for selecting the max range 
+#define PIDMaxValue 225 // pid  value just for selecting the max range 
 #define Fan A4
 #define Contactor 8
 
@@ -106,6 +106,7 @@ void CheckSystemBatteryMode();
 void EEPROM_FactorySettings();
 void SetCalibrationVoltage();
 void WelcomeScreen();
+void checkCutOffVoltage();
 //-------------------------------------------Functions---------------------------------------------- 
 void GPIO_Init()
 {
@@ -131,6 +132,7 @@ CheckForGrid();
 //--------------------------------------------Interrupt-------------------------------------------
 void AC_Control()
 {
+
 //-> if grid is not available 
 if (digitalRead(AC_Available_Grid)==1)
 { 
@@ -139,7 +141,7 @@ if (Vin_Battery_Calibrated>cutVoltage )
 TCCR1B=0x04; //start timer with divide by 256 input
 TCNT1=0;
 }
-else  if (Vin_Battery_Calibrated<cutVoltage)
+else  if (Vin_Battery_Calibrated<=cutVoltage)
 {
  TCCR1B=0x00 ; // stop the timer for no having any output 
  PID_Value=0; 
@@ -167,6 +169,7 @@ if (PWM_Value==0) PWM_Value=1; // can't be zero because it will give sto the out
 OCR1A=PWM_Value;
  } // end if second time
 }
+
 }  // end function 
 //---------------------------------END INTERRUPT------------------------------------
 ISR(TIMER1_COMPA_vect)
@@ -248,7 +251,7 @@ void Segment_Timer_Update ()
     {
       if (digitalRead(AC_Available_Grid)==0)
       {
-      sevseg.setChars("GON");
+      sevseg.setChars("UON");
       sevseg.refreshDisplay();
       } else 
       {
@@ -432,7 +435,7 @@ lastTime=now;  // save last time for sampling time
 } // end if sample time 
 }  //end if vin_battery 
 
-else  if (Vin_Battery_Calibrated < cutVoltage)
+else  if (Vin_Battery_Calibrated <= cutVoltage)
 {
   PID_Value=0; 
   PID_I=0; 
@@ -447,7 +450,6 @@ else  if (Vin_Battery_Calibrated < cutVoltage)
 
  if(digitalRead(AC_Available_Grid)==0)
 {
-  PID_ComputeForUtility();
   currentMillis = millis();
   if (currentMillis - previousMillis >= 1000)  // encrement variable every second 
   {
@@ -1002,6 +1004,13 @@ void WelcomeScreen()
 displayWelcomeScreen=1;
 }
 
+//-------------------------------------CHECK FOR LOW CUT OFF----------------------------------
+void checkCutOffVoltage()
+{
+
+
+
+}
 //*****************************************MAIN LOOP********************************************
 void setup() {
   // put your setup code here, to run once:
