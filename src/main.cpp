@@ -246,7 +246,7 @@ void Segment_Timer_Update ()
     if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
     ) 
     {
-    sevseg.setNumber(HeatingPower); // Displays '3.141' 
+    sevseg.setNumber(PID_MaxHeatingValue); // Displays '3.141' 
     sevseg.refreshDisplay(); 
     }  
 
