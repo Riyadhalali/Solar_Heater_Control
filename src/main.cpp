@@ -601,7 +601,7 @@ if (SolarMaxPower>100)  SolarMaxPower=0;
 if (SolarMaxPower<0) SolarMaxPower=0;
 } // end while up and down
 }  // end main while 
-PID_MaxHeatingValue=OCR1A_MaxValue - ( 2.5 * SolarMaxPower);  // (2.5 = 255 / 100 )
+PID_MaxHeatingValue=OCR1A_MaxValue -  (OCR1A_MaxValue * SolarMaxPower) /100.0;  
 EEPROM.write(8,SolarMaxPower); 
 EEPROM.write(9,PID_MaxHeatingValue); // for solar this value 
 //-> must zero all values so the inverter want have a big ampers causing it to restart
@@ -676,7 +676,7 @@ if (UtilityMaxPower>100)  UtilityMaxPower=0;
 if (UtilityMaxPower<0) UtilityMaxPower=0;
 } // end while up and down
 }  // end main while 
-PID_MaxHeatingValueUtility=OCR1A_MaxValue - ( 2.5 * UtilityMaxPower);  // (2.5 = 255 / 100 )
+PID_MaxHeatingValueUtility=OCR1A_MaxValue - ( OCR1A_MaxValue * UtilityMaxPower) /100.0;  // (2.5 = 255 / 100 )
 EEPROM.write(11,UtilityMaxPower); 
 EEPROM.write(12,PID_MaxHeatingValueUtility); // for solar this value
 PID_Value=0; 
