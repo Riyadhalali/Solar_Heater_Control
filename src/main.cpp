@@ -19,7 +19,7 @@ SevSeg sevseg; //Instantiate a seven segment object
 #define Up 1
 #define Down 0
 #define PWM 9	
-#define PULSE 4  //trigger pulse width (counts)
+#define PULSE 4//trigger pulse width (counts)
 #define OCR1A_MaxValue 254
 #define PIDMaxValue 254 // pid  value just for selecting the max range 
 #define Fan A4
@@ -81,6 +81,7 @@ double VinBatteryDifference=0.0;
 char addError=0;
 float Vin_Battery_Calibrated=0.0;   // this is the reading voltage 
 char displayWelcomeScreen=0,displayVersionNumber=0;
+char  contactorEnableLowBattery=0;    
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
@@ -107,6 +108,8 @@ void EEPROM_FactorySettings();
 void SetCalibrationVoltage();
 void WelcomeScreen();
 void checkCutOffVoltage();
+void checkContactor();
+void SetContactorLatch(); // enable turn off contactor when battery voltage is low 
 //-------------------------------------------Functions---------------------------------------------- 
 void GPIO_Init()
 {
@@ -138,8 +141,13 @@ if (digitalRead(AC_Available_Grid)==1)
 { 
 if (Vin_Battery_Calibrated>cutVoltage )
 {
+if(PWM_Value==0) PWM_Value=1;
+OCR1A=PWM_Value;
+if (PWM_Value<OCR1A_MaxValue)
+{
 TCCR1B=0x04; //start timer with divide by 256 input
-TCNT1=0;   // very important to make overflow for switching 
+//TCNT1=0;   // very important to make overflow for switching 
+}
 }
 else  if (Vin_Battery_Calibrated<=cutVoltage)
 {
@@ -152,8 +160,8 @@ else  if (Vin_Battery_Calibrated<=cutVoltage)
 }
 
 //-> Making range of pwm_value and it must not be zero
-if (PWM_Value>=OCR1A_MaxValue )  TCCR1B=0x00 ; // stop the timer for no having any output 
-else if(PWM_Value<OCR1A_MaxValue ) 
+if (PWM_Value>=OCR1A_MaxValue )  TCCR1B=0x00; //start timer with divide by 256 input ; // stop the timer for no having any output 
+ else if(PWM_Value<OCR1A_MaxValue ) 
 {
 //-> check that range of PWM_value is between 1 and 255
 if (PWM_Value==0) PWM_Value=1; // can't be zero because it will give sto the output 
@@ -163,9 +171,8 @@ OCR1A=PWM_Value;
 else if (digitalRead(AC_Available_Grid)==0)
 {
  if(SecondsReadTime> DelayTime) 
-  {
+{
 TCCR1B=0x04; //start timer with divide by 256 input
-TCNT1=0; 
 //-> check that range of PWM_value is between 1 and 255
 
 if (PWM_Value==0) PWM_Value=1; // can't be zero because it will give sto the output 
@@ -241,6 +248,7 @@ void Segment_Timer_Update ()
     )
     {
     sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
+     //  sevseg.setNumber(OCR1A); // Displays '3.141' 
     sevseg.refreshDisplay();
     }
     if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
@@ -303,6 +311,12 @@ void Segment_Timer_Update ()
     sevseg.refreshDisplay();  
     }
 
+    if(SetupProgramNumber==8)
+    {
+    sevseg.setChars("P08"); 
+    sevseg.refreshDisplay();  
+    }
+
 
     // displaying variables 
     if (SetupProgramNumber==10)    
@@ -343,6 +357,13 @@ void Segment_Timer_Update ()
     if (SetupProgramNumber==17)    
     {
     sevseg.setNumberF(VinBatteryError,1);
+    sevseg.refreshDisplay(); 
+    } 
+    if (SetupProgramNumber==18)    
+    {
+
+    if (contactorEnableLowBattery==1) sevseg.setChars("ON");
+    if (contactorEnableLowBattery==0) sevseg.setChars("OFF");
     sevseg.refreshDisplay(); 
     } 
  
@@ -394,6 +415,7 @@ if (digitalRead(AC_Available_Grid)==1)
 //-> for solar heating power 
 if(Vin_Battery_Calibrated>cutVoltage)
 {
+ 
 currentMillis = millis();
 if (currentMillis - previousMillis >= 1000)  // encrement variable every second 
 {
@@ -402,7 +424,7 @@ SecondsReadTime++;
 }
 if (SecondsReadTime>DelayTime) 
 {
-  //How long since we last calculated
+//How long since we last calculated
 now = millis();
 timeChange = (double)(now - lastTime);
 if (timeChange >= SampleTimeInSeconds*1000)
@@ -444,7 +466,7 @@ else  if (Vin_Battery_Calibrated <= cutVoltage)
   PID_Value=0; 
   PID_I=0; 
   PID_P=0;
-  digitalWrite(PWM,LOW);
+    digitalWrite(PWM,LOW);
   TCCR1B=0x00 ; // stop the timer for no having any output so no output because i can't wait for interrupt to happen to turn off loads
   HeatingPower=map(PID_Value,0,PIDMaxValue,0,SolarMaxPower);
   PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260
@@ -496,6 +518,8 @@ SetDelayTime();
 delay(500);
 SetCalibrationVoltage();
 delay(500); 
+SetContactorLatch();
+delay(500);
 SetupProgramNumber=0; 
 insideSetup=0;
 }
@@ -758,6 +782,37 @@ VinBatteryDifference=fabs(VinBatteryError-Vin_Battery_Calibrated);
 EEPROM.write(15,addError);
 EEPROM.put(16,VinBatteryDifference);
 }  // end function 
+//-----------------------------------------CONTACTOR LATCH WHEN BATTERY LOW---------------------
+void SetContactorLatch()
+{
+delay(500);
+while(digitalRead(Enter)==0 )
+{
+SetupProgramNumber=8;
+} 
+delay(500); 
+while (digitalRead(Enter)==0 )
+{
+SetupProgramNumber=18;
+
+while (digitalRead(Up)==1 || digitalRead(Down)==1) 
+{
+if (digitalRead(Up)==1) 
+{
+delay(100);
+contactorEnableLowBattery=1;
+}
+if (digitalRead(Down)==1) 
+{
+delay(100);
+contactorEnableLowBattery=0;
+}
+if (contactorEnableLowBattery>1)  contactorEnableLowBattery=1;
+if (contactorEnableLowBattery<0) contactorEnableLowBattery=0;
+} // end while up and down
+}  // end main while 
+EEPROM.write(20,contactorEnableLowBattery); 
+}
 //-----------------------------------------EEPROM Load------------------------------------------
 void EEPROM_Load()
 {
@@ -773,6 +828,7 @@ PID_MaxHeatingValueUtility=EEPROM.read(12);
 EEPROM.get(13,DelayTime); 
 addError=EEPROM.read(15); 
 EEPROM.get(16,VinBatteryDifference);
+contactorEnableLowBattery=EEPROM.read(20); 
 }
 //---------------------------------------CheckForParams-----------------------------------------
 void CheckForParams()
@@ -848,6 +904,14 @@ if (VinBatteryDifference<0 || VinBatteryDifference>=70 || isnan(VinBatteryDiffer
   EEPROM_Load();
 }
 
+
+ if (contactorEnableLowBattery<0 || contactorEnableLowBattery>1 || isnan(contactorEnableLowBattery)) 
+{
+  contactorEnableLowBattery=1;
+  EEPROM.write(20,contactorEnableLowBattery); 
+  EEPROM_Load();
+}
+
 }
 //-----------------------------------------Check For Grid--------------------------------------
 void PID_ComputeForUtility()
@@ -907,7 +971,10 @@ TCCR1B=0x00; // turn off
 digitalWrite(PWM,LOW);
 HeatingPower=0;
 SecondsReadTime=0;
+if(Vin_Battery_Calibrated>cutVoltage)
+{
 digitalWrite(Contactor,0);  // TURN OFF CONTACTOR
+}
 }
 }
 //---------------------------------------Fan Turn Off------------------------------------------
@@ -932,7 +999,8 @@ if (secondsFan>=fanTime)
 if (PWM_Value>0 && PWM_Value <OCR1A_MaxValue)
 { 
   fanState=1; //heating is on so fan must turn on 
-  digitalWrite(Fan,HIGH);  //turn on fan  
+  digitalWrite(Fan,HIGH);  //turn on fan 
+   
 }
 }
 
@@ -984,6 +1052,7 @@ PID_MaxHeatingValueUtility=OCR1A_MaxValue - ( OCR1A_MaxValue * UtilityMaxPower) 
 DelayTime=1;   // delay time to start the heater
 addError=1; 
 VinBatteryDifference=0; 
+contactorEnableLowBattery=1; 
 /*ً Save Values to EEPROM */
 EEPROM.put(0,cutVoltage); 
 EEPROM.put(4,Setpoint); 
@@ -995,6 +1064,7 @@ EEPROM.write(12,PID_MaxHeatingValueUtility);
 EEPROM.put(13,DelayTime); 
 EEPROM.write(15,addError);
 EEPROM.put(16,VinBatteryDifference);
+EEPROM.write(20,contactorEnableLowBattery); 
 EEPROM_Load();
 }
 //-----------------------------------------PRESS DETECT-----------------------------------------
@@ -1028,6 +1098,22 @@ if(digitalRead(AC_Available_Grid)==1)
 }
 
 }
+//--------------------------------------CONTACTOR STATE WHEN BATTERY LOW------------------------
+//when battery is low to make sure that output is switched off out of inverter the contactor will turn to another mode 
+// so on. when heating is started again the contactor will return to basic state 
+// user must enable program 8
+void checkContactor()
+{
+  
+  if (PWM_Value<OCR1A_MaxValue && digitalRead(AC_Available_Grid)==1 && contactorEnableLowBattery==1) 
+  {
+    digitalWrite(Contactor,LOW);
+  }
+  else if (Vin_Battery_Calibrated<=cutVoltage && digitalRead(AC_Available_Grid)==1 && contactorEnableLowBattery==1)
+  {
+     digitalWrite(Contactor,HIGH); // turn off the loads from no to nc for battery pro
+  }
+}
 //*****************************************MAIN LOOP********************************************
 void setup() {
   // put your setup code here, to run once:
@@ -1047,6 +1133,7 @@ void loop() {
    PID_Compute();
    CheckForGrid();   
    checkFan();
+   checkContactor(); 
    CheckSystemBatteryMode();   // to determine battery system mode 
    factorySettings();
    checkCutOffVoltage(); // to make sure all is off when battery voltage is down
