@@ -20,8 +20,8 @@ SevSeg sevseg; //Instantiate a seven segment object
 #define Down 0
 #define PWM 9	
 #define PULSE 4//trigger pulse width (counts)
-#define OCR1A_MaxValue 254
-#define PIDMaxValue 254 // pid  value just for selecting the max range 
+#define OCR1A_MaxValue 245
+#define PIDMaxValue 245 // pid  value just for selecting the max range 
 #define Fan A4
 #define Contactor 8
 
@@ -136,15 +136,15 @@ CheckForGrid();
 //--------------------------------------------Interrupt-------------------------------------------
 void AC_Control()
 {
-
 //-> if grid is not available 
 if (digitalRead(AC_Available_Grid)==1)
 { 
 if (Vin_Battery_Calibrated>cutVoltage )
 {
-if(PWM_Value==0) PWM_Value=1;
-if ( HeatingPower > 5) OCR1A=PWM_Value;
+//if   (PWM_Value==0) PWM_Value=1;
+//if ( HeatingPower > 5) OCR1A=PWM_Value;
 
+//*******************************************************************
 if (PWM_Value<OCR1A_MaxValue && HeatingPower > 5)
 {
 TCCR1B=0x04; //start timer with divide by 256 input
@@ -160,9 +160,11 @@ else  if (Vin_Battery_Calibrated<=cutVoltage)
  PID_I=0;
  PID_P=0;
 }
+//*******************************END IF*******************************
 
 //-> Making range of pwm_value and it must not be zero
 if (PWM_Value>=OCR1A_MaxValue ) 
+
 {
   ///>@ very important 
  digitalWrite(PWM,LOW); // if this line was not exists then when heating power reaches 0 then the output will become max because there is nothing driving the triac
@@ -180,29 +182,40 @@ OCR1A=PWM_Value;
 //------------------------------------------END OF GRID NOT AVAILABLE-------------------------------
 else if (digitalRead(AC_Available_Grid)==0)
 {
- if(SecondsReadTime> DelayTime) 
+
+//-> check that range of PWM_value is between 1 and 255
+//if (PWM_Value==0) PWM_Value=1; // can't be zero because it will give sto the output 
+//OCR1A=PWM_Value;
+//***********************NEW PART FOR AC GRID**********************************
+if (PWM_Value>=OCR1A_MaxValue ) 
+{
+///>@ very important 
+ digitalWrite(PWM,LOW); // if this line was not exists then when heating power reaches 0 then the output will become max because there is nothing driving the triac
+ TCCR1B=0x00; //start timer with divide by 256 input ; // stop the timer for no having any output 
+ PWM_Value=OCR1A_MaxValue;
+ OCR1A=PWM_Value; // to make smooth ouput
+}
+ else if(PWM_Value<OCR1A_MaxValue  && HeatingPower > 5) 
 {
 TCCR1B=0x04; //start timer with divide by 256 input
 TCNT1 = 0;   //reset timer - count from zero
 //-> check that range of PWM_value is between 1 and 255
-
 if (PWM_Value==0) PWM_Value=1; // can't be zero because it will give sto the output 
 OCR1A=PWM_Value;
- } // end if second time
 }
-
+}  // END AC GRID AVAILABLE 
 }  // end function 
 //---------------------------------END INTERRUPT------------------------------------
 ISR(TIMER1_COMPA_vect)
 { 
   //comparator match
-  
+  //-
   if (PWM_Value< OCR1A_MaxValue && PWM_Value >1 ) 
   {
    digitalWrite(PWM,HIGH);     //set TRIAC gate to high
    TCNT1 = 65536-PULSE;       //trigger pulse width
   } 
-  else 
+  else         // WHEN LOAD IS 100% to make full output 
   {
    digitalWrite(PWM,HIGH);    //set TRIAC gate to high
   } 
@@ -213,7 +226,7 @@ ISR(TIMER1_COMPA_vect)
 
 ISR(TIMER1_OVF_vect){       //timer1 overflow
 
- if (PWM_Value <=OCR1A_MaxValue && PWM_Value >1 )
+ if (PWM_Value <OCR1A_MaxValue && PWM_Value >1 )
  {
   digitalWrite(PWM,LOW);    //turn off TRIAC gate
   TCCR1B = 0x00;            //disable timer stopd unintended triggers
@@ -1133,5 +1146,6 @@ void loop() {
    CheckSystemBatteryMode();   // to determine battery system mode 
    factorySettings();
    checkCutOffVoltage(); // to make sure all is off when battery voltage is down
-   delay(500);
+   delay(100);
+
 }   // end of main ... 
