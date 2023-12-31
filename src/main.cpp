@@ -182,10 +182,6 @@ OCR1A=PWM_Value;
 //------------------------------------------END OF GRID NOT AVAILABLE-------------------------------
 else if (digitalRead(AC_Available_Grid)==0)
 {
-
-//-> check that range of PWM_value is between 1 and 255
-//if (PWM_Value==0) PWM_Value=1; // can't be zero because it will give sto the output 
-//OCR1A=PWM_Value;
 //***********************NEW PART FOR AC GRID**********************************
 if (PWM_Value>=OCR1A_MaxValue ) 
 {
