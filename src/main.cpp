@@ -21,7 +21,7 @@ SevSeg sevseg; //Instantiate a seven segment object
 #define PWM 9	
 #define PULSE 4//trigger pulse width (counts)
 #define OCR1A_MaxValue 245
-#define PIDMaxValue 245 // pid  value just for selecting the max range 
+#define PIDMaxValue 1000 // pid  value just for selecting the max range 
 #define Fan A4
 #define Contactor 8
 
@@ -111,6 +111,7 @@ void WelcomeScreen();
 void checkCutOffVoltage();
 void checkContactor();
 void SetContactorLatch(); // enable turn off contactor when battery voltage is low 
+void Screen();  
 //-------------------------------------------Functions---------------------------------------------- 
 void GPIO_Init()
 {
@@ -136,6 +137,7 @@ CheckForGrid();
 //--------------------------------------------Interrupt-------------------------------------------
 void AC_Control()
 {
+
 //-> if grid is not available 
 if (digitalRead(AC_Available_Grid)==1)
 { 
@@ -182,6 +184,10 @@ OCR1A=PWM_Value;
 //------------------------------------------END OF GRID NOT AVAILABLE-------------------------------
 else if (digitalRead(AC_Available_Grid)==0)
 {
+
+//-> check that range of PWM_value is between 1 and 255
+//if (PWM_Value==0) PWM_Value=1; // can't be zero because it will give sto the output 
+//OCR1A=PWM_Value;
 //***********************NEW PART FOR AC GRID**********************************
 if (PWM_Value>=OCR1A_MaxValue ) 
 {
@@ -279,33 +285,33 @@ void Segment_Timer_Update ()
     
     TCNT2=0;    // very important 
     ScreenTimer++;
-    if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
-    )
-    {
-    sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
-     //  sevseg.setNumber(OCR1A); // Displays '3.141' 
     sevseg.refreshDisplay();
-    }
-    if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
-    ) 
-    {
-    sevseg.setNumber(HeatingPower); // Displays '3.141' 
-    sevseg.refreshDisplay(); 
-    }  
+    // if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
+    // )
+    // {
+ 
+    // sevseg.refreshDisplay();
+    // }
+    // if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
+    // ) 
+    // {
+    // sevseg.setNumber(HeatingPower); // Displays '3.141' 
+    // sevseg.refreshDisplay(); 
+    // }  
 
-   if (ScreenTimer>7000 && ScreenTimer< 9000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
-   ) 
-    {
-      if (digitalRead(AC_Available_Grid)==0)
-      {
-      sevseg.setChars("UON");
-      sevseg.refreshDisplay();
-      } else 
-      {
-       sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
-       sevseg.refreshDisplay();
-      }
-    }  
+//    if (ScreenTimer>7000 && ScreenTimer< 9000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
+//    ) 
+//     {
+//       if (digitalRead(AC_Available_Grid)==0)
+//       {
+//       sevseg.setChars("UON");
+//       sevseg.refreshDisplay();
+//       } else 
+//       {
+//        sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
+//        sevseg.refreshDisplay();
+//       }
+//     }  
 
     if (SetupProgramNumber==1) 
     {
@@ -438,8 +444,9 @@ void Segment_Timer_Update ()
         esc=0;
       }
     }
-//------------------------------------------------END OF WELECOME SCREEN-----------------------------------------
-if (ScreenTimer > 9000) ScreenTimer=0; 
+// //------------------------------------------------END OF WELECOME SCREEN-----------------------------------------
+ if (ScreenTimer > 9000) ScreenTimer=0; 
+
  }
 //---------------------------------------------------------------------------------
 void PID_Compute()
@@ -577,12 +584,12 @@ while (digitalRead(Up)==1 || digitalRead(Down)==1)
 {
 if (digitalRead(Up)==1) 
 {
-delay(100);  
+delay(150);  
 cutVoltage+=0.1; 
 }
 if (digitalRead(Down)==1) 
 {
-delay(100);
+delay(150);
 cutVoltage-=0.1;
 }
 if(cutVoltage>60) cutVoltage=60.0;
@@ -609,12 +616,12 @@ while (digitalRead(Up)==1 || digitalRead(Down)==1)
 {
 if (digitalRead(Up)==1) 
 {
-delay(100);  
+delay(150);  
 Setpoint+=0.1; 
 }
 if (digitalRead(Down)==1) 
 {
-delay(100);
+delay(150);
 Setpoint-=0.1;
 }
 } // end while up and down 
@@ -641,12 +648,12 @@ while (digitalRead(Up)==1 || digitalRead(Down)==1)
 {
 if (digitalRead(Up)==1) 
 {
-delay(100);
+delay(150);
 SolarMaxPower++;
 }
 if (digitalRead(Down)==1) 
 {
-delay(100);
+delay(150);
 SolarMaxPower--;
 }
 if (SolarMaxPower>100)  SolarMaxPower=100;
@@ -680,12 +687,12 @@ while (digitalRead(Up)==1 || digitalRead(Down)==1)
 {
 if (digitalRead(Up)==1) 
  {
-delay(100);
+delay(150);
 SampleTimeInSeconds++;
 }
 if (digitalRead(Down)==1) 
 {
-delay(100);
+delay(150);
 SampleTimeInSeconds--;
 } 
 if(SampleTimeInSeconds > 60 ) SampleTimeInSeconds=60; 
@@ -712,12 +719,12 @@ while (digitalRead(Up)==1 || digitalRead(Down)==1)
 {
 if (digitalRead(Up)==1) 
 {
-delay(100);
+delay(150);
 UtilityMaxPower++;
 }
 if (digitalRead(Down)==1) 
 {
-delay(100);
+delay(150);
 UtilityMaxPower--;
 }
 if (UtilityMaxPower>100)  UtilityMaxPower=100;
@@ -758,7 +765,7 @@ if (digitalRead(Down)==1)
 delay(100);
 DelayTime--;
 }
-if (DelayTime>900)  DelayTime=900;
+if (DelayTime>300)  DelayTime=300;
 if (DelayTime<0) DelayTime=0;
 } // end while up and down
 }  // end main while 
@@ -785,12 +792,12 @@ while (digitalRead(Up)==1 || digitalRead(Down)==1)
 {
 if (digitalRead(Up)==1) 
 {
-delay(100);
+delay(150);
 VinBatteryError+=0.1;
 }
 if (digitalRead(Down)==1) 
 {
-delay(100);
+delay(150);
 VinBatteryError-=0.1;
 }
 if (VinBatteryError > 70.0  ) VinBatteryError=70.0;
@@ -1119,6 +1126,34 @@ void checkContactor()
      digitalWrite(Contactor,HIGH); // turn off the loads from no to nc for battery pro
   }
 }
+//---------------------------------------------------SCREEN--------------------------------------------------
+void Screen()
+{
+    if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
+    )
+    {
+   sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
+    
+    }
+    if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
+    ) 
+    {
+    sevseg.setNumber(HeatingPower); // Displays '3.141' 
+    }  
+      if (ScreenTimer>7000 && ScreenTimer< 9000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
+   ) 
+    {
+      if (digitalRead(AC_Available_Grid)==0)
+      {
+      sevseg.setChars("UON");
+      sevseg.refreshDisplay();
+      } else 
+      {
+       sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
+       sevseg.refreshDisplay();
+      }
+    }  
+}
 //*****************************************MAIN LOOP********************************************
 void setup() {
   // put your setup code here, to run once:
@@ -1142,6 +1177,6 @@ void loop() {
    CheckSystemBatteryMode();   // to determine battery system mode 
    factorySettings();
    checkCutOffVoltage(); // to make sure all is off when battery voltage is down
+   Screen();
    delay(100);
-
 }   // end of main ... 
