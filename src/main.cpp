@@ -765,7 +765,7 @@ if (digitalRead(Down)==1)
 delay(100);
 DelayTime--;
 }
-if (DelayTime>300)  DelayTime=300;
+if (DelayTime>60)  DelayTime=60;
 if (DelayTime<0) DelayTime=0;
 } // end while up and down
 }  // end main while 
