@@ -21,7 +21,7 @@ SevSeg sevseg; //Instantiate a seven segment object
 #define PWM 9	
 #define PULSE 4//trigger pulse width (counts)
 #define OCR1A_MaxValue 245
-#define PIDMaxValue 1000 // pid  value just for selecting the max range 
+#define PIDMaxValue 500 // pid  value just for selecting the max range 
 #define Fan A4
 #define Contactor 8
 
@@ -52,17 +52,17 @@ char SolarMaxPower=0,UtilityMaxPower=0;
 char GridMaxPower=0; 
 float PID_MaxHeatingValue;
 float PID_MaxHeatingValueUtility;
-unsigned long lastTime;// for timing in PID controller 
+unsigned long lastTime,lastTime_2;// for timing in PID controller 
 int SampleTimeInSeconds=0;
 int PWM_Value=OCR1A_MaxValue;   // start value 
 unsigned long longPressTime = 500; // Duration of a long press in milliseconds
 boolean loopRunning = false; // Flag indicating whether the loop is running
 bool InProgramMode=false; 
 char LoadsAlreadySwitchOff=0;
-unsigned long now;
-double timeChange;
+unsigned long now,now_2;
+double timeChange,timeChange_2;
 char CountRealTimeSeconds=0; // to start counting real time seconds 
-unsigned int SecondsReadTime=0,DelayTime=0;
+unsigned int SecondsReadTime=0;
 unsigned int overflowTimes=0; 
 int ledState=LOW;
 unsigned long previousMillis = 0;  // will store last time LED was updated
@@ -72,7 +72,7 @@ const long interval = 1000;  // interval at which to blink (milliseconds)
 char fanState=0;
 unsigned long currentMillisFan,previousMillisFan;
 char secondsFan=0; 
-char fanTime=60;  // fan time to turn off is 60 seconds 
+char fanTime=5;  // fan time to turn off is 60 seconds 
 char SystemBatteryMode=0; // for checking the battery system  mode 
 char displayResetMessage=0;
 unsigned int esc=0;  
@@ -83,6 +83,9 @@ float Vin_Battery_Calibrated=0.0;   // this is the reading voltage
 char displayWelcomeScreen=0,displayVersionNumber=0;
 char  contactorEnableLowBattery=0;   
 char MiniSolarPowerStart=5; 
+uint8_t DelayTime=0; 
+float accelerationValueUtility=0; 
+char timetoReachMax=90 ; // time to make the utilty reach it max value 
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
@@ -285,7 +288,7 @@ void Segment_Timer_Update ()
     
     TCNT2=0;    // very important 
     ScreenTimer++;
-    sevseg.refreshDisplay();
+    
     // if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
     // )
     // {
@@ -316,46 +319,46 @@ void Segment_Timer_Update ()
     if (SetupProgramNumber==1) 
     {
     sevseg.setChars("P01"); 
-    sevseg.refreshDisplay(); 
+    //sevseg.refreshDisplay(); 
      
     }
     if (SetupProgramNumber==2) 
     {
     sevseg.setChars("P02"); 
-    sevseg.refreshDisplay(); 
+    //sevseg.refreshDisplay(); 
    
     }
     if (SetupProgramNumber==3) 
     {
     sevseg.setChars("P03"); 
-    sevseg.refreshDisplay(); 
+    //sevseg.refreshDisplay(); 
     } 
     if (SetupProgramNumber==4) 
     {
     sevseg.setChars("P04"); 
-    sevseg.refreshDisplay(); 
+    //sevseg.refreshDisplay(); 
     } 
       if (SetupProgramNumber==5) 
     {
     sevseg.setChars("P05"); 
-    sevseg.refreshDisplay(); 
+    //sevseg.refreshDisplay(); 
     } 
      if (SetupProgramNumber==6) 
     {
     sevseg.setChars("P06"); 
-    sevseg.refreshDisplay(); 
+    //sevseg.refreshDisplay(); 
     } 
 
     if(SetupProgramNumber==7)
     {
     sevseg.setChars("P07"); 
-    sevseg.refreshDisplay();  
+    //sevseg.refreshDisplay();  
     }
 
     if(SetupProgramNumber==8)
     {
     sevseg.setChars("P08"); 
-    sevseg.refreshDisplay();  
+   // sevseg.refreshDisplay();  
     }
 
 
@@ -363,55 +366,55 @@ void Segment_Timer_Update ()
     if (SetupProgramNumber==10)    
     {
     sevseg.setNumberF(cutVoltage,1);
-    sevseg.refreshDisplay(); 
+    //sevseg.refreshDisplay(); 
     } 
     if (SetupProgramNumber==11)    
     {
     sevseg.setNumberF(Setpoint,1);
-    sevseg.refreshDisplay(); 
+   // sevseg.refreshDisplay(); 
     } 
     if (SetupProgramNumber==12)    
     {
     sevseg.setNumberF(Setpoint,1);
-    sevseg.refreshDisplay(); 
+    //sevseg.refreshDisplay(); 
     } 
     if (SetupProgramNumber==13)    
     {
     sevseg.setNumber(SolarMaxPower);
-    sevseg.refreshDisplay(); 
+   // sevseg.refreshDisplay(); 
     } 
     if (SetupProgramNumber==14)    
     {
     sevseg.setNumber(SampleTimeInSeconds);
-    sevseg.refreshDisplay(); 
+   // sevseg.refreshDisplay(); 
     } 
     if (SetupProgramNumber==15)    
     {
     sevseg.setNumber(UtilityMaxPower);
-    sevseg.refreshDisplay(); 
+   // sevseg.refreshDisplay(); 
     } 
       if (SetupProgramNumber==16)    
     {
     sevseg.setNumber(DelayTime);
-    sevseg.refreshDisplay(); 
+   // sevseg.refreshDisplay(); 
     } 
     if (SetupProgramNumber==17)    
     {
     sevseg.setNumberF(VinBatteryError,1);
-    sevseg.refreshDisplay(); 
+    //sevseg.refreshDisplay(); 
     } 
     if (SetupProgramNumber==18)    
     {
 
     if (contactorEnableLowBattery==1) sevseg.setChars("ON");
     if (contactorEnableLowBattery==0) sevseg.setChars("OFF");
-    sevseg.refreshDisplay(); 
+   // sevseg.refreshDisplay(); 
     } 
  
     if (displayResetMessage==1)
     {
       sevseg.setChars("RST");
-      sevseg.refreshDisplay();
+     // sevseg.refreshDisplay();
       esc++; 
       if (esc==2500)
       {
@@ -423,7 +426,7 @@ void Segment_Timer_Update ()
     if (displayWelcomeScreen==1)
     {
       sevseg.setChars("SHC");
-      sevseg.refreshDisplay();
+     // sevseg.refreshDisplay();
        esc++; 
       if (esc==1500)
       {
@@ -436,7 +439,7 @@ void Segment_Timer_Update ()
      if (displayVersionNumber==1)
     {
       sevseg.setChars("V1.0");
-      sevseg.refreshDisplay();
+      //sevseg.refreshDisplay();
        esc++; 
       if (esc==1500)
       {
@@ -445,10 +448,11 @@ void Segment_Timer_Update ()
       }
     }
 // //------------------------------------------------END OF WELECOME SCREEN-----------------------------------------
+  sevseg.refreshDisplay();            // refresh display according to variable selected 
  if (ScreenTimer > 9000) ScreenTimer=0; 
 
  }
-//---------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 void PID_Compute()
 {
 
@@ -521,7 +525,7 @@ else  if (Vin_Battery_Calibrated <= cutVoltage)
 
  if(digitalRead(AC_Available_Grid)==0)
 {
-  currentMillis = millis();
+   currentMillis = millis();
   if (currentMillis - previousMillis >= 1000)  // encrement variable every second 
   {
   previousMillis = currentMillis;
@@ -542,7 +546,6 @@ TCCR1B=0;  // zero timer
 TCCR1B |= (1<<WGM12); 
 TIMSK1  |= (1 <<OCIE1A) | (1<< TOIE1) ;   // TIMER OVERFLOW AND INTERRUPT ENABLE 
 }
-
 //----------------------------------------Setup Program------------------------------
 void SetupProgram()
 {
@@ -755,17 +758,17 @@ SetupProgramNumber=16;
 
 while (digitalRead(Up)==1 || digitalRead(Down)==1) 
 {
-if (digitalRead(Up)==1) 
+if (digitalRead(Up)==1  ) 
 {
 delay(100);
 DelayTime++;
 }
-if (digitalRead(Down)==1) 
+if (digitalRead(Down)==1 ) 
 {
 delay(100);
 DelayTime--;
 }
-if (DelayTime>60)  DelayTime=60;
+if (DelayTime>240)  DelayTime=0;
 if (DelayTime<0) DelayTime=0;
 } // end while up and down
 }  // end main while 
@@ -940,17 +943,17 @@ if (VinBatteryDifference<0 || VinBatteryDifference>=70 || isnan(VinBatteryDiffer
 }
 
 }
-//-----------------------------------------Check For Grid--------------------------------------
+//-------------------------------------------Check For Grid--------------------------------------
 void PID_ComputeForUtility()
 {
-
   /*How long since we last calculated*/
-unsigned long now = millis();
-double timeChange = (double)(now - lastTime);
-if (timeChange >= SampleTimeInSeconds*1000)
+now = millis();
+timeChange = (double)(now - lastTime);
+if (timeChange >= (SampleTimeInSeconds*1000))
 {
+accelerationValueUtility=PIDMaxValue / timetoReachMax ; 
 // when grid available just increment the heating power regarless of the battery we done
-PID_Value++; 
+PID_Value+=accelerationValueUtility; 
 if (PID_Value <0) PID_Value=0;
 if (PID_Value > PIDMaxValue) PID_Value=PIDMaxValue;
 HeatingPower=map(PID_Value,0,PIDMaxValue,0,UtilityMaxPower); // map pid value show the range between 1- 260 what is the power 
@@ -1009,11 +1012,10 @@ if (secondsFan>=fanTime)
 }
 }  
 if (PWM_Value>0 && PWM_Value <OCR1A_MaxValue)
-{ 
+ { 
   fanState=1; //heating is on so fan must turn on 
   digitalWrite(Fan,HIGH);  //turn on fan 
-   
-}
+ }
 }
 
 //----------------------------------------Check Battery System Voltage---------------------------
@@ -1061,7 +1063,7 @@ PID_MaxHeatingValue=OCR1A_MaxValue -  (OCR1A_MaxValue * SolarMaxPower) /100.0;  
 SampleTimeInSeconds=1;   //samples of pid controller taked snapshots 
 UtilityMaxPower=100;     // max utility power 
 PID_MaxHeatingValueUtility=OCR1A_MaxValue - ( OCR1A_MaxValue * UtilityMaxPower) /100.0;  // (2.5 = 255 / 100 )
-DelayTime=1;   // delay time to start the heater
+DelayTime=10;   // delay time to start the heater
 addError=1; 
 VinBatteryDifference=0; 
 contactorEnableLowBattery=1; 
@@ -1132,13 +1134,14 @@ void Screen()
     if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
     )
     {
-   sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
+     sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
+  
     
     }
     if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
     ) 
     {
-    sevseg.setNumber(HeatingPower); // Displays '3.141' 
+    sevseg.setNumber(HeatingPower); 
     }  
       if (ScreenTimer>7000 && ScreenTimer< 9000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
    ) 
@@ -1146,12 +1149,11 @@ void Screen()
       if (digitalRead(AC_Available_Grid)==0)
       {
       sevseg.setChars("UON");
-      sevseg.refreshDisplay();
+      
       } else 
       {
        sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
-       sevseg.refreshDisplay();
-      }
+       }
     }  
 }
 //*****************************************MAIN LOOP********************************************
