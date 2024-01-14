@@ -264,7 +264,7 @@ ADC_Value=analogRead(A3);
 Battery_Voltage=(ADC_Value *5.0)/1024.0;
 Battery[i]=((10.5/0.5)*Battery_Voltage);
 sum+=Battery[i];
-delay(10);
+delay(20);
 } 
 Vin_Battery=sum/100.0;
 if (addError==1) Vin_Battery_Calibrated=Vin_Battery+VinBatteryDifference;
@@ -913,7 +913,7 @@ if (PID_MaxHeatingValueUtility<0 || PID_MaxHeatingValueUtility>OCR1A_MaxValue ||
   EEPROM_Load();
 }
 
-if (DelayTime<0 || DelayTime>=900 || isnan(DelayTime)) 
+if (DelayTime<0 || DelayTime>=240 || isnan(DelayTime)) 
 {
   DelayTime=10;
   EEPROM.put(13,DelayTime); 
