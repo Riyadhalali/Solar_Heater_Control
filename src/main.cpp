@@ -996,7 +996,7 @@ digitalWrite(Contactor,0);  // TURN OFF CONTACTOR
 void checkFan()
 { 
 
-if (PWM_Value>=OCR1A_MaxValue)
+if (PWM_Value>=OCR1A_MaxValue  )
 { 
 fanState=0;                // heating is off make this variable off and turn fan after 60 seconds
 currentMillisFan=millis();
@@ -1011,7 +1011,7 @@ if (secondsFan>=fanTime)
   secondsFan=0;
 }
 }  
-if (PWM_Value>0 && PWM_Value <OCR1A_MaxValue)
+if (PWM_Value>0 && PWM_Value <OCR1A_MaxValue && HeatingPower >= 15)
  { 
   fanState=1; //heating is on so fan must turn on 
   digitalWrite(Fan,HIGH);  //turn on fan 
@@ -1178,7 +1178,7 @@ void loop() {
    checkContactor(); 
    CheckSystemBatteryMode();   // to determine battery system mode 
    factorySettings();
-   checkCutOffVoltage(); // to make sure all is off when battery voltage is down
-   Screen();
+   checkCutOffVoltage();      // to make sure all is off when battery voltage is down
+   Screen(); 
    delay(100);
 }   // end of main ... 
