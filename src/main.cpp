@@ -42,7 +42,7 @@ double Setpoint, Input, Output; // set point is the desired value for heating
 double Kp=20,Ki=20,Kd=0;
 uint16_t ScreenTimer=0;
 float cutVoltage=0;
-double PID_Value,PID_P,PID_I,PID_Error;
+float PID_Value,PID_P,PID_I,PID_Error;
 double HeatingPower=0;
 int x=0,y=0;
 char SetupProgramNumber=0;
@@ -79,13 +79,14 @@ unsigned int esc=0;
 double VinBatteryError=0.0;
 double VinBatteryDifference=0.0;
 char addError=0;
-float Vin_Battery_Calibrated=0.0;   // this is the reading voltage 
+double Vin_Battery_Calibrated=0.0;   // this is the reading voltage 
 char displayWelcomeScreen=0,displayVersionNumber=0;
 char  contactorEnableLowBattery=0;   
 char MiniSolarPowerStart=5; 
 uint8_t DelayTime=0; 
 float accelerationValueUtility=0; 
 char timetoReachMax=90 ; // time to make the utilty reach it max value 
+char amplifeError=2; // to make error bigger when battery voltage is equal 
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
@@ -269,6 +270,9 @@ delay(20);
 Vin_Battery=sum/100.0;
 if (addError==1) Vin_Battery_Calibrated=Vin_Battery+VinBatteryDifference;
 else if(addError==0)  Vin_Battery_Calibrated=Vin_Battery-VinBatteryDifference;
+//-> added this section because when fan starts it takes 
+//if (fanState==1) Vin_Battery_Calibrated+=0.1; 
+//if (fanState==0) Vin_Battery_Calibrated-=0.1;
 
 }
 //-------------------------------------Timer for updating screen reads--------------------------
@@ -289,33 +293,6 @@ void Segment_Timer_Update ()
     TCNT2=0;    // very important 
     ScreenTimer++;
     
-    // if (ScreenTimer> 0 && ScreenTimer < 5000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
-    // )
-    // {
- 
-    // sevseg.refreshDisplay();
-    // }
-    // if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
-    // ) 
-    // {
-    // sevseg.setNumber(HeatingPower); // Displays '3.141' 
-    // sevseg.refreshDisplay(); 
-    // }  
-
-//    if (ScreenTimer>7000 && ScreenTimer< 9000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
-//    ) 
-//     {
-//       if (digitalRead(AC_Available_Grid)==0)
-//       {
-//       sevseg.setChars("UON");
-//       sevseg.refreshDisplay();
-//       } else 
-//       {
-//        sevseg.setNumberF(Vin_Battery_Calibrated,1); // Displays '3.141'
-//        sevseg.refreshDisplay();
-//       }
-//     }  
-
     if (SetupProgramNumber==1) 
     {
     sevseg.setChars("P01"); 
@@ -438,7 +415,7 @@ void Segment_Timer_Update ()
 
      if (displayVersionNumber==1)
     {
-      sevseg.setChars("V1.0");
+      sevseg.setChars("V1.1");
       //sevseg.refreshDisplay();
        esc++; 
       if (esc==1500)
@@ -476,8 +453,8 @@ timeChange = (double)(now - lastTime);
 if (timeChange >= SampleTimeInSeconds*1000)
 {
  // calculate error 
-PID_Error=Vin_Battery_Calibrated-Setpoint; 
- //calculate the p value 
+PID_Error=((Vin_Battery_Calibrated+0.1)-(Setpoint))*amplifeError; // 0.1 is for making the shc start when float voltage is equal to the reading volt
+          //calculate the p value 
 PID_P=Kp*PID_Error; 
 if (PID_P <0) PID_P=0;
 if (PID_P > PIDMaxValue) PID_P=PIDMaxValue; 
@@ -699,7 +676,7 @@ delay(150);
 SampleTimeInSeconds--;
 } 
 if(SampleTimeInSeconds > 60 ) SampleTimeInSeconds=60; 
-if(SampleTimeInSeconds < 0 )  SampleTimeInSeconds=0; 
+if(SampleTimeInSeconds < 1 )  SampleTimeInSeconds=0; 
 } // end while up and down
 } // end main while 
 EEPROM.write(10,SampleTimeInSeconds); 
@@ -1141,8 +1118,9 @@ void Screen()
     if (ScreenTimer>5000 && ScreenTimer< 7000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
     ) 
     {
-    sevseg.setNumber(HeatingPower); 
-    }  
+     sevseg.setNumber(HeatingPower); 
+    //sevseg.setNumberF(Setpoint,1); // Displays '3.141'
+     }  
       if (ScreenTimer>7000 && ScreenTimer< 9000 && insideSetup==0 && SetupProgramNumber==0 && displayResetMessage==0 &&  displayWelcomeScreen==0 &&  displayVersionNumber==0 
    ) 
     {
@@ -1171,7 +1149,7 @@ void loop() {
   // put your main code here, to run repeatedly:
    button.tick();
    CheckForParams();
-   Read_Battery();
+   Read_Battery();      
    PID_Compute();
    CheckForGrid();   
    checkFan();
