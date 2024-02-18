@@ -72,7 +72,8 @@ const long interval = 1000;  // interval at which to blink (milliseconds)
 char fanState=0;
 unsigned long currentMillisFan,previousMillisFan;
 char secondsFan=0; 
-char fanTime=5;  // fan time to turn off is 60 seconds 
+char fanTimeOff=5;  // fan time to turn off is 60 seconds 
+char fanTimeOn=30;
 char SystemBatteryMode=0; // for checking the battery system  mode 
 char displayResetMessage=0;
 unsigned int esc=0;  
@@ -266,7 +267,7 @@ Battery_Voltage=(ADC_Value *5.0)/1024.0;
 Battery[i]=((10.5/0.5)*Battery_Voltage);
 sum+=Battery[i];
 delay(20);
-} 
+}   
 Vin_Battery=sum/100.0;
 if (addError==1) Vin_Battery_Calibrated=Vin_Battery+VinBatteryDifference;
 else if(addError==0)  Vin_Battery_Calibrated=Vin_Battery-VinBatteryDifference;
@@ -415,7 +416,7 @@ void Segment_Timer_Update ()
 
      if (displayVersionNumber==1)
     {
-      sevseg.setChars("V1.1");
+      sevseg.setChars("V1.2");
       //sevseg.refreshDisplay();
        esc++; 
       if (esc==1500)
@@ -528,6 +529,9 @@ void SetupProgram()
 {
 insideSetup=1;
 SetupProgramNumber=1; 
+secondsFan=0 ;             // make time also zero 
+fanState=0;               // make fan state zero 
+digitalWrite(Fan,LOW);   // turn off fan
 SetCutVoltage();
 delay(500);
 SetFloatVoltage();   // set point 
@@ -973,6 +977,7 @@ digitalWrite(Contactor,0);  // TURN OFF CONTACTOR
 void checkFan()
 { 
 
+//----------------------------------STOP FAN----------------------------------------
 if (PWM_Value>=OCR1A_MaxValue  )
 { 
 fanState=0;                // heating is off make this variable off and turn fan after 60 seconds
@@ -982,17 +987,32 @@ if(currentMillisFan-previousMillisFan>=1000)
 previousMillisFan=currentMillisFan;
 secondsFan++ ; 
 }
-if (secondsFan>=fanTime) 
+if (secondsFan>=fanTimeOff) 
 {
   digitalWrite(Fan,LOW); //turn off fan after 60 seconds
   secondsFan=0;
 }
-}  
+}
+
+//---------------------------------STARTS FAN---------------------------------
 if (PWM_Value>0 && PWM_Value <OCR1A_MaxValue && HeatingPower >= 15)
  { 
   fanState=1; //heating is on so fan must turn on 
+  currentMillisFan=millis();
+  if(currentMillisFan-previousMillisFan>=1000) 
+  {
+  previousMillisFan=currentMillisFan;
+  secondsFan++ ; 
+  }
+
+  if (secondsFan>=fanTimeOn)
+  {
   digitalWrite(Fan,HIGH);  //turn on fan 
+  secondsFan=0;
+  }
  }
+//-------------------------------------------------------------------------
+
 }
 
 //----------------------------------------Check Battery System Voltage---------------------------
