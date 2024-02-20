@@ -60,7 +60,8 @@ boolean loopRunning = false; // Flag indicating whether the loop is running
 bool InProgramMode=false; 
 char LoadsAlreadySwitchOff=0;
 unsigned long now,now_2;
-double timeChange,timeChange_2;
+unsigned long readBatteryNow; 
+double timeChange,timeChange_2,timeChangeBattery;
 char CountRealTimeSeconds=0; // to start counting real time seconds 
 unsigned int SecondsReadTime=0;
 unsigned int overflowTimes=0; 
@@ -70,7 +71,7 @@ unsigned long currentMillis=0;
 // constants won't change:
 const long interval = 1000;  // interval at which to blink (milliseconds)
 char fanState=0;
-unsigned long currentMillisFan,previousMillisFan;
+unsigned long currentMillisFan,previousMillisFan,currentMillisBattery,prevoiusMillisBattery;
 char secondsFan=0; 
 char fanTimeOff=5;  // fan time to turn off is 60 seconds 
 char fanTimeOn=30;
@@ -88,6 +89,7 @@ uint8_t DelayTime=0;
 float accelerationValueUtility=0; 
 char timetoReachMax=90 ; // time to make the utilty reach it max value 
 char amplifeError=2; // to make error bigger when battery voltage is equal 
+char fanisOn=0;
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
@@ -260,21 +262,24 @@ void Read_Battery()
 {
 unsigned char i=0;
 float sum=0 , Battery[100];
-for (  i=0; i<100 ; i++)
+for ( i=0; i<100 ; i++)
 {
+//currentMillisBattery=millis();
+//if(currentMillisBattery-prevoiusMillisBattery>= 100)
+//{ 
+//prevoiusMillisBattery=currentMillisBattery;
 ADC_Value=analogRead(A3);
-Battery_Voltage=(ADC_Value *5.0)/1024.0;
+Battery_Voltage=(ADC_Value *5.0)/1023.0;
 Battery[i]=((10.5/0.5)*Battery_Voltage);
 sum+=Battery[i];
-delay(20);
-}   
+delay(10);
+//} // end if millis 
+}  // end for  
 Vin_Battery=sum/100.0;
 if (addError==1) Vin_Battery_Calibrated=Vin_Battery+VinBatteryDifference;
 else if(addError==0)  Vin_Battery_Calibrated=Vin_Battery-VinBatteryDifference;
 //-> added this section because when fan starts it takes 
-//if (fanState==1) Vin_Battery_Calibrated+=0.1; 
-//if (fanState==0) Vin_Battery_Calibrated-=0.1;
-
+//if (fanisOn==1) Vin_Battery_Calibrated+=0.1; 
 }
 //-------------------------------------Timer for updating screen reads--------------------------
 void Segment_Timer_Update ()
@@ -680,7 +685,7 @@ delay(150);
 SampleTimeInSeconds--;
 } 
 if(SampleTimeInSeconds > 60 ) SampleTimeInSeconds=60; 
-if(SampleTimeInSeconds < 1 )  SampleTimeInSeconds=0; 
+if(SampleTimeInSeconds < 1 )  SampleTimeInSeconds=1; 
 } // end while up and down
 } // end main while 
 EEPROM.write(10,SampleTimeInSeconds); 
@@ -991,6 +996,7 @@ if (secondsFan>=fanTimeOff)
 {
   digitalWrite(Fan,LOW); //turn off fan after 60 seconds
   secondsFan=0;
+  fanisOn=0;
 }
 }
 
@@ -1008,6 +1014,7 @@ if (PWM_Value>0 && PWM_Value <OCR1A_MaxValue && HeatingPower >= 15)
   if (secondsFan>=fanTimeOn)
   {
   digitalWrite(Fan,HIGH);  //turn on fan 
+  fanisOn=1;
   secondsFan=0;
   }
  }
