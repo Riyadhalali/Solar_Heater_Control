@@ -262,6 +262,7 @@ void Read_Battery()
 {
 unsigned char i=0;
 float sum=0 , Battery[100];
+float fanError=0; 
 for ( i=0; i<100 ; i++)
 {
 //currentMillisBattery=millis();
@@ -276,10 +277,11 @@ delay(10);
 //} // end if millis 
 }  // end for  
 Vin_Battery=sum/100.0;
-if (addError==1) Vin_Battery_Calibrated=Vin_Battery+VinBatteryDifference;
-else if(addError==0)  Vin_Battery_Calibrated=Vin_Battery-VinBatteryDifference;
 //-> added this section because when fan starts it takes 
-//if (fanisOn==1) Vin_Battery_Calibrated+=0.1; 
+if (fanisOn==1) fanError=0.075 ; else (fanError=0);  // for fan error 
+if (addError==1) Vin_Battery_Calibrated=Vin_Battery+VinBatteryDifference+fanError;
+else if(addError==0)  Vin_Battery_Calibrated=Vin_Battery-VinBatteryDifference+fanError;
+
 }
 //-------------------------------------Timer for updating screen reads--------------------------
 void Segment_Timer_Update ()
@@ -421,7 +423,7 @@ void Segment_Timer_Update ()
 
      if (displayVersionNumber==1)
     {
-      sevseg.setChars("V1.2");
+      sevseg.setChars("V1.3");
       //sevseg.refreshDisplay();
        esc++; 
       if (esc==1500)
