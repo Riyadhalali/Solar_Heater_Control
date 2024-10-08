@@ -48,17 +48,18 @@ int x=0,y=0;
 char SetupProgramNumber=0;
 char SetupProgramNumberVariables=0;  // this variable to display the variable of the program when entering program 
 char insideSetup=0;
-unsigned int SolarMaxPower=0,UtilityMaxPower=0;
+char SolarMaxPower=0,UtilityMaxPower=0;
 char GridMaxPower=0; 
 float PID_MaxHeatingValue;
 float PID_MaxHeatingValueUtility;
 unsigned long lastTime,lastTime_2;// for timing in PID controller 
+int SampleTimeInSeconds=0;
 int PWM_Value=OCR1A_MaxValue;   // start value 
 unsigned long longPressTime = 500; // Duration of a long press in milliseconds
 boolean loopRunning = false; // Flag indicating whether the loop is running
 bool InProgramMode=false; 
 char LoadsAlreadySwitchOff=0;
-unsigned long now,now_2,lastIncreaseTime=0,lastDecreaseTime=0;
+unsigned long now,now_2;
 unsigned long readBatteryNow; 
 double timeChange,timeChange_2,timeChangeBattery;
 char CountRealTimeSeconds=0; // to start counting real time seconds 
@@ -89,8 +90,6 @@ float accelerationValueUtility=0;
 char timetoReachMax=90 ; // time to make the utilty reach it max value 
 char amplifeError=2; // to make error bigger when battery voltage is equal 
 char fanisOn=0;
-double IncreaseTimeInSeconds = 1;  // Time interval for increasing PWM_Value
-double DecreaseTimeInSeconds = 1;  // Time interval for decreasing PWM_Value
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
@@ -101,7 +100,7 @@ void EEPROM_Load();
 void SetSolarMaxPower();
 void CheckForParams();
 void Press_Detect();
-void SetIncreaseTime();
+void Sample_Timing();
 void longPress();
 void shortPress(); 
 void SetUtilityMaxPower();
@@ -120,7 +119,6 @@ void checkCutOffVoltage();
 void checkContactor();
 void SetContactorLatch(); // enable turn off contactor when battery voltage is low 
 void Screen();  
-void SetDecreaseTime();
 //-------------------------------------------Functions---------------------------------------------- 
 void GPIO_Init()
 {
@@ -156,7 +154,7 @@ if (Vin_Battery_Calibrated>cutVoltage )
 //if ( HeatingPower > 5) OCR1A=PWM_Value;
 
 //*******************************************************************
-if (PWM_Value<OCR1A_MaxValue && HeatingPower > 50)
+if (PWM_Value<OCR1A_MaxValue && HeatingPower > 5)
 {
 TCCR1B=0x04; //start timer with divide by 256 input
 TCNT1 = 0;   //reset timer - count from zero
@@ -183,7 +181,7 @@ if (PWM_Value>=OCR1A_MaxValue )
  PWM_Value=OCR1A_MaxValue;
  OCR1A=PWM_Value; // to make smooth ouput
 }
- else if(PWM_Value<OCR1A_MaxValue  && HeatingPower > 50) 
+ else if(PWM_Value<OCR1A_MaxValue  && HeatingPower > 5) 
 {
 //-> check that range of PWM_value is between 1 and 255
 if (PWM_Value==0) PWM_Value=1; // can't be zero because it will give sto the output 
@@ -206,7 +204,7 @@ if (PWM_Value>=OCR1A_MaxValue )
  PWM_Value=OCR1A_MaxValue;
  OCR1A=PWM_Value; // to make smooth ouput
 }
- else if(PWM_Value<OCR1A_MaxValue  && HeatingPower > 50) 
+ else if(PWM_Value<OCR1A_MaxValue  && HeatingPower > 5) 
 {
 TCCR1B=0x04; //start timer with divide by 256 input
 TCNT1 = 0;   //reset timer - count from zero
@@ -221,7 +219,7 @@ ISR(TIMER1_COMPA_vect)
 { 
   //comparator match
   //-
-  if (PWM_Value< OCR1A_MaxValue && PWM_Value >1) 
+  if (PWM_Value< OCR1A_MaxValue && PWM_Value >1 ) 
   {
    digitalWrite(PWM,HIGH);     //set TRIAC gate to high
    TCNT1 = 65536-PULSE;       //trigger pulse width
@@ -280,7 +278,7 @@ delay(10);
 }  // end for  
 Vin_Battery=sum/100.0;
 //-> added this section because when fan starts it takes 
-if (fanisOn==1) fanError=0.065 ; else (fanError=0);  // for fan error 
+if (fanisOn==1) fanError=0.075 ; else (fanError=0);  // for fan error 
 if (addError==1) Vin_Battery_Calibrated=Vin_Battery+VinBatteryDifference+fanError;
 else if(addError==0)  Vin_Battery_Calibrated=Vin_Battery-VinBatteryDifference+fanError;
 
@@ -348,12 +346,6 @@ void Segment_Timer_Update ()
    // sevseg.refreshDisplay();  
     }
 
-     if(SetupProgramNumber==9)
-    {
-    sevseg.setChars("P09"); 
-   // sevseg.refreshDisplay();  
-    }
-
 
     // displaying variables 
     if (SetupProgramNumber==10)    
@@ -378,31 +370,25 @@ void Segment_Timer_Update ()
     } 
     if (SetupProgramNumber==14)    
     {
-    sevseg.setNumber(IncreaseTimeInSeconds);
+    sevseg.setNumber(SampleTimeInSeconds);
    // sevseg.refreshDisplay(); 
     } 
-     if (SetupProgramNumber==15)    
-    {
-    sevseg.setNumber(DecreaseTimeInSeconds);
-   // sevseg.refreshDisplay(); 
-    } 
-
-    if (SetupProgramNumber==16)    
+    if (SetupProgramNumber==15)    
     {
     sevseg.setNumber(UtilityMaxPower);
    // sevseg.refreshDisplay(); 
     } 
-      if (SetupProgramNumber==17)    
+      if (SetupProgramNumber==16)    
     {
     sevseg.setNumber(DelayTime);
    // sevseg.refreshDisplay(); 
     } 
-    if (SetupProgramNumber==18)    
+    if (SetupProgramNumber==17)    
     {
     sevseg.setNumberF(VinBatteryError,1);
     //sevseg.refreshDisplay(); 
     } 
-    if (SetupProgramNumber==19)    
+    if (SetupProgramNumber==18)    
     {
 
     if (contactorEnableLowBattery==1) sevseg.setChars("ON");
@@ -437,7 +423,7 @@ void Segment_Timer_Update ()
 
      if (displayVersionNumber==1)
     {
-      sevseg.setChars("V1.5");
+      sevseg.setChars("V1.4");
       //sevseg.refreshDisplay();
        esc++; 
       if (esc==1500)
@@ -452,212 +438,91 @@ void Segment_Timer_Update ()
 
  }
 //-------------------------------------------------------------------------------------------------------------------
-// void PID_Compute()
-// {
-
-// if (digitalRead(AC_Available_Grid)==1) 
-// {
-// //-> for solar heating power 
-// if(Vin_Battery_Calibrated>cutVoltage)
-// {
- 
-// currentMillis = millis();
-// if (currentMillis - previousMillis >= 1000)  // encrement variable every second 
-// {
-// previousMillis = currentMillis;
-// SecondsReadTime++; 
-// }
-// if (SecondsReadTime>DelayTime) 
-// {
-// //How long since we last calculated
-// now = millis();
-
-// timeChange = (double)(now - lastTime);
-// if (timeChange >= IncreaseTimeInSeconds*1000)
-// {
-//  // calculate error 
-// PID_Error=((Vin_Battery_Calibrated+0.1)-(Setpoint))*amplifeError; // 0.1 is for making the shc start when float voltage is equal to the reading volt
-//           //calculate the p value 
-// PID_P=Kp*PID_Error; 
-// if (PID_P <0) PID_P=0;
-// if (PID_P > PIDMaxValue) PID_P=PIDMaxValue; 
-// // calculate the I controller 
-// PID_I=PID_I+ (Ki*PID_Error);
-// if (PID_I <0) PID_I=0;
-// if (PID_I > PIDMaxValue) PID_I=PIDMaxValue; 
-// // calcaulte the pid value final 
-// PID_Value=PID_P+PID_I ; 
-// // to make range of pid 
-// if (PID_Value <0) PID_Value=0;
-// if (PID_Value > PIDMaxValue) PID_Value=PIDMaxValue; 
-// //
-// //Calculation method:
-// //Solar Max Power : 40 % 
-// //PID_maxValue= 255 (OCR1A max value) - ( 2.5 (step) * Solar Max Power)
-// //OCR1A=map(PID_value(0-255),0,PID_maxValue,255,PID_maxValue+1 (+1 so OCR1A not become zero ever )) 
-// //OCR1A as testing can be 260 or lower because according to equation i need 10ms 
-// //Timer_count=  ( 10 MS * 10^-3 ) * ( 8*10^6 ) / 256 = 311
-// //AS FROM TESTING :
-// //best value was 260 or lower so load can be still on when the heating power is zero 
- 
-// HeatingPower=map(PID_Value,0,PIDMaxValue,0,SolarMaxPower); // map pid value show the range between 1- 260 what is the power 
-// PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 255 decfined in ocr1a_maxvalue
-// lastTime=now;  // save last time for sampling time 
-// } // end if sample 
-// } // end if sample time 
-// }  //end if vin_battery 
-
-// else  if (Vin_Battery_Calibrated <= cutVoltage)
-// {
-//   PID_Value=0; 
-//   PID_I=0; 
-//   PID_P=0;
-//   digitalWrite(PWM,LOW);
-//   SecondsReadTime=0; 
-//   PWM_Value=OCR1A_MaxValue;
-//   TCCR1B=0x00 ; // stop the timer for no having any output so no output because i can't wait for interrupt to happen to turn off loads
-//   HeatingPower=map(PID_Value,0,PIDMaxValue,0,SolarMaxPower);
-//   PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260
-//   // we also can stop timer to make output zero but i have done it in interrupts 
-// }  // end else if 
-// } // end if ac_available grid 
-
-
-//  if(digitalRead(AC_Available_Grid)==0)
-// {
-//    currentMillis = millis();
-//   if (currentMillis - previousMillis >= 1000)  // encrement variable every second 
-//   {
-//   previousMillis = currentMillis;
-//   SecondsReadTime++; 
-//   }
-
-//   if (SecondsReadTime> DelayTime)  // check for the delay time required to start 
-//   {
-//     PID_ComputeForUtility();
-//   }
-// }
-// } // end of pid_compute function
-//---------------------------NEW PID COMPUTE FUNCTION BASED ON CHATGPT------------------------
 void PID_Compute()
 {
+
+if (digitalRead(AC_Available_Grid)==1) 
+{
+//-> for solar heating power 
+if(Vin_Battery_Calibrated>cutVoltage)
+{
+ 
+currentMillis = millis();
+if (currentMillis - previousMillis >= 1000)  // encrement variable every second 
+{
+previousMillis = currentMillis;
+SecondsReadTime++; 
+}
+if (SecondsReadTime>DelayTime) 
+{
+//How long since we last calculated
+now = millis();
+timeChange = (double)(now - lastTime);
+if (timeChange >= SampleTimeInSeconds*1000)
+{
+ // calculate error 
+PID_Error=((Vin_Battery_Calibrated+0.1)-(Setpoint))*amplifeError; // 0.1 is for making the shc start when float voltage is equal to the reading volt
+          //calculate the p value 
+PID_P=Kp*PID_Error; 
+if (PID_P <0) PID_P=0;
+if (PID_P > PIDMaxValue) PID_P=PIDMaxValue; 
+// calculate the I controller 
+PID_I=PID_I+ (Ki*PID_Error);
+if (PID_I <0) PID_I=0;
+if (PID_I > PIDMaxValue) PID_I=PIDMaxValue; 
+// calcaulte the pid value final 
+PID_Value=PID_P+PID_I ; 
+// to make range of pid 
+if (PID_Value <0) PID_Value=0;
+if (PID_Value > PIDMaxValue) PID_Value=PIDMaxValue; 
+//
 //Calculation method:
 //Solar Max Power : 40 % 
-//PID_maxValue= 245 (OCR1A max value) - ( 2.5 (step) * Solar Max Power)/100.0
+//PID_maxValue= 255 (OCR1A max value) - ( 2.5 (step) * Solar Max Power)
 //OCR1A=map(PID_value(0-255),0,PID_maxValue,255,PID_maxValue+1 (+1 so OCR1A not become zero ever )) 
 //OCR1A as testing can be 260 or lower because according to equation i need 10ms 
 //Timer_count=  ( 10 MS * 10^-3 ) * ( 8*10^6 ) / 256 = 311
 //AS FROM TESTING :
 //best value was 260 or lower so load can be still on when the heating power is zero 
+ 
+HeatingPower=map(PID_Value,0,PIDMaxValue,0,SolarMaxPower); // map pid value show the range between 1- 260 what is the power 
+PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 255 decfined in ocr1a_maxvalue
+lastTime=now;  // save last time for sampling time 
+} // end if sample 
+} // end if sample time 
+}  //end if vin_battery 
 
-    if (digitalRead(AC_Available_Grid) == 1) 
-    {
-        if (Vin_Battery_Calibrated > cutVoltage)
-        {
-            currentMillis = millis();
+else  if (Vin_Battery_Calibrated <= cutVoltage)
+{
+  PID_Value=0; 
+  PID_I=0; 
+  PID_P=0;
+  digitalWrite(PWM,LOW);
+  SecondsReadTime=0; 
+  PWM_Value=OCR1A_MaxValue;
+  TCCR1B=0x00 ; // stop the timer for no having any output so no output because i can't wait for interrupt to happen to turn off loads
+  HeatingPower=map(PID_Value,0,PIDMaxValue,0,SolarMaxPower);
+  PWM_Value=map(PID_Value,0,PIDMaxValue,OCR1A_MaxValue,PID_MaxHeatingValue+1); // minus value of pwm is 1 and max value is 260
+  // we also can stop timer to make output zero but i have done it in interrupts 
+}  // end else if 
+} // end if ac_available grid 
 
-            if (currentMillis - previousMillis >= 1000)  // Increment variable every second
-            {
-                previousMillis = currentMillis;
-                SecondsReadTime++;
-            }
 
-            if (SecondsReadTime > DelayTime) 
-            {
-                // Calculate PID only after delay
-                now = millis();
+ if(digitalRead(AC_Available_Grid)==0)
+{
+   currentMillis = millis();
+  if (currentMillis - previousMillis >= 1000)  // encrement variable every second 
+  {
+  previousMillis = currentMillis;
+  SecondsReadTime++; 
+  }
 
-                // Calculate the error
-                PID_Error = ((Vin_Battery_Calibrated + 0.1) - Setpoint) * amplifeError;
-
-                // Handle PID increase based on the error
-                if (PID_Error > 0)  // Voltage is below setpoint, increase PWM_Value
-                {
-                    if ((now - lastIncreaseTime) >= IncreaseTimeInSeconds * 1000)
-                    {
-                        lastIncreaseTime = now;
-
-                        // Calculate P and I terms
-                        PID_P = Kp * PID_Error;
-                        if (PID_P < 0) PID_P = 0;
-                        if (PID_P > PIDMaxValue) PID_P = PIDMaxValue;
-
-                        PID_I = PID_I + (Ki * PID_Error);
-                        if (PID_I < 0) PID_I = 0;
-                        if (PID_I > PIDMaxValue) PID_I = PIDMaxValue;
-
-                        // Final PID value
-                        PID_Value = PID_P + PID_I;
-                        if (PID_Value < 0) PID_Value = 0;
-                        if (PID_Value > PIDMaxValue) PID_Value = PIDMaxValue;
-
-                        // Map PID value to heating power
-                        HeatingPower = map(PID_Value, 0, PIDMaxValue, 0, SolarMaxPower);
-                        //PID_MaxHeatingValue MUST BE MAPPED IN RANGE OF 255 
-                        PWM_Value = map(PID_Value, 0, PIDMaxValue, OCR1A_MaxValue, PID_MaxHeatingValue + 1);
-                    }
-                }
-                else if (PID_Error < 0)  // Voltage is above setpoint, decrease PWM_Value
-                {
-                    if ((now - lastDecreaseTime) >= DecreaseTimeInSeconds * 1000)
-                    {
-                        lastDecreaseTime = now;
-
-                        // Calculate P and I terms (similar logic as for increase)
-                        PID_P = Kp * PID_Error;
-                        if (PID_P < 0) PID_P = 0;
-                        if (PID_P > PIDMaxValue) PID_P = PIDMaxValue;
-
-                        PID_I = PID_I + (Ki * PID_Error);
-                        if (PID_I < 0) PID_I = 0;
-                        if (PID_I > PIDMaxValue) PID_I = PIDMaxValue;
-
-                        // Final PID value
-                        PID_Value = PID_P + PID_I;
-                        if (PID_Value < 0) PID_Value = 0;
-                        if (PID_Value > PIDMaxValue) PID_Value = PIDMaxValue;
-
-                        // Map PID value to heating power
-                        HeatingPower = map(PID_Value, 0, PIDMaxValue, 0, SolarMaxPower);
-                        PWM_Value = map(PID_Value, 0, PIDMaxValue, OCR1A_MaxValue, PID_MaxHeatingValue + 1);
-                    }
-                }
-
-                // Save the last time for sampling
-                lastTime = now;
-            }
-        }
-        else
-        {
-            // Reset if voltage goes below cut level
-            PID_Value = 0;
-            PID_I = 0;
-            PID_P = 0;
-            digitalWrite(PWM, LOW);
-            SecondsReadTime = 0;
-            PWM_Value = OCR1A_MaxValue;
-            TCCR1B = 0x00;  // Stop the timer
-            HeatingPower = map(PID_Value, 0, PIDMaxValue, 0, SolarMaxPower);
-            PWM_Value = map(PID_Value, 0, PIDMaxValue, OCR1A_MaxValue, PID_MaxHeatingValue + 1);
-        }
-    }
-
-    if (digitalRead(AC_Available_Grid) == 0)
-    {
-        currentMillis = millis();
-        if (currentMillis - previousMillis >= 1000)  // Increment variable every second
-        {
-            previousMillis = currentMillis;
-            SecondsReadTime++;
-        }
-
-        if (SecondsReadTime > DelayTime)  // Check for the delay time required to start
-        {
-            PID_ComputeForUtility();
-        }
-    }
+  if (SecondsReadTime> DelayTime)  // check for the delay time required to start 
+  {
+    PID_ComputeForUtility();
+  }
 }
-
+}
 //-------------------------------------------Timer Init---------------------------------------
 void Timer_Init()
 {
@@ -680,9 +545,7 @@ SetFloatVoltage();   // set point
 delay(500);
 SetSolarMaxPower();
 delay(500);
-SetIncreaseTime();
-delay(500);
-SetDecreaseTime();
+Sample_Timing();
 delay(500);
 SetUtilityMaxPower();
 delay(500);
@@ -776,23 +639,21 @@ while (digitalRead(Up)==1 || digitalRead(Down)==1)
 {
 if (digitalRead(Up)==1) 
 {
-delay(50);
+delay(150);
 SolarMaxPower++;
 }
 if (digitalRead(Down)==1) 
 {
-delay(50);
+delay(150);
 SolarMaxPower--;
 }
-if (SolarMaxPower>1000)  SolarMaxPower=1000;
+if (SolarMaxPower>100)  SolarMaxPower=100;
 if (SolarMaxPower<0) SolarMaxPower=0;
 } // end while up and down
 }  // end main while 
- //PID_MaxHeatingValue MUST BE MAPPED IN RANGE OF 255 
- //PID_MaxHeatingValue=OCR1A_MaxValue -  (OCR1A_MaxValue * SolarMaxPower) /100.0;  
-PID_MaxHeatingValue=OCR1A_MaxValue -  (OCR1A_MaxValue * (SolarMaxPower/10.0)) /100.0;  
-EEPROM.put(8,SolarMaxPower); 
-EEPROM.put(90,PID_MaxHeatingValue); // for solar this value 
+PID_MaxHeatingValue=OCR1A_MaxValue -  (OCR1A_MaxValue * SolarMaxPower) /100.0;  
+EEPROM.write(8,SolarMaxPower); 
+EEPROM.write(9,PID_MaxHeatingValue); // for solar this value 
 //-> must zero all values so the inverter want have a big ampers causing it to restart
 PID_Value=0; 
 PID_I=0; 
@@ -800,8 +661,7 @@ PID_P=0;
 PWM_Value=OCR1A_MaxValue;
 }
 //-----------------------------------------Sampling time-----------------------------------------
-// for increasing 
-void SetIncreaseTime()
+void Sample_Timing()
 {
 delay(500);
  while(digitalRead(Enter)==0)
@@ -819,88 +679,52 @@ while (digitalRead(Up)==1 || digitalRead(Down)==1)
 if (digitalRead(Up)==1) 
  {
 delay(150);
-//IncreaseTimeInSeconds++;
-IncreaseTimeInSeconds++; 
+SampleTimeInSeconds++;
 }
 if (digitalRead(Down)==1) 
 {
 delay(150);
-IncreaseTimeInSeconds --;
+SampleTimeInSeconds--;
 } 
-if(IncreaseTimeInSeconds > 60 ) IncreaseTimeInSeconds=60; 
-if(IncreaseTimeInSeconds < 1 )  IncreaseTimeInSeconds=1; 
+if(SampleTimeInSeconds > 60 ) SampleTimeInSeconds=60; 
+if(SampleTimeInSeconds < 1 )  SampleTimeInSeconds=1; 
 } // end while up and down
 } // end main while 
-EEPROM.write(10,IncreaseTimeInSeconds); 
+EEPROM.write(10,SampleTimeInSeconds); 
 }
-//-----------------------------------------SET DECREASE TIME-----------------------------------
-void SetDecreaseTime()
-{
- delay(500);
- while(digitalRead(Enter)==0)
-{
-  SetupProgramNumber=5;
-
-}
-delay(500);
-while (digitalRead(Enter)==0) 
-{
-  SetupProgramNumber=15;
-
-while (digitalRead(Up)==1 || digitalRead(Down)==1) 
-{
-if (digitalRead(Up)==1) 
- {
-delay(150);
-DecreaseTimeInSeconds++; 
-}
-if (digitalRead(Down)==1) 
-{
-delay(150);
-DecreaseTimeInSeconds --;
-} 
-if(DecreaseTimeInSeconds > 60 ) DecreaseTimeInSeconds=60; 
-if(DecreaseTimeInSeconds < 1 )  DecreaseTimeInSeconds=1; 
-} // end while up and down
-} // end main while 
-EEPROM.write(1,DecreaseTimeInSeconds);  
-}
-
 //-----------------------------------------Set utility max power-------------------------------
 void SetUtilityMaxPower()
 {
 delay(500);
 while(digitalRead(Enter)==0 )
 {
-SetupProgramNumber=6;
+SetupProgramNumber=5;
 
 } 
 delay(500); 
 while (digitalRead(Enter)==0 )
 {
-SetupProgramNumber=16;
+SetupProgramNumber=15;
 
 while (digitalRead(Up)==1 || digitalRead(Down)==1) 
 {
 if (digitalRead(Up)==1) 
 {
-delay(50);
+delay(150);
 UtilityMaxPower++;
 }
 if (digitalRead(Down)==1) 
 {
-delay(50);
+delay(150);
 UtilityMaxPower--;
 }
-if (UtilityMaxPower>1000)  UtilityMaxPower=1000;
+if (UtilityMaxPower>100)  UtilityMaxPower=100;
 if (UtilityMaxPower<0) UtilityMaxPower=0;
 } // end while up and down
 }  // end main while 
- //PID_MaxHeatingValueUtility MUST BE MAPPED IN RANGE OF 255 
- //PID_MaxHeatingValueUtility=OCR1A_MaxValue - ( OCR1A_MaxValue * UtilityMaxPower) /100.0;  // (2.5 = 255 / 100 )
-PID_MaxHeatingValueUtility=OCR1A_MaxValue - ( OCR1A_MaxValue * (UtilityMaxPower/10.0)) /100.0;  // (2.5 = 255 / 100 )
-EEPROM.put(11,UtilityMaxPower); 
-EEPROM.put(120,PID_MaxHeatingValueUtility); // for solar this value
+PID_MaxHeatingValueUtility=OCR1A_MaxValue - ( OCR1A_MaxValue * UtilityMaxPower) /100.0;  // (2.5 = 255 / 100 )
+EEPROM.write(11,UtilityMaxPower); 
+EEPROM.write(12,PID_MaxHeatingValueUtility); // for solar this value
 PID_Value=0; 
 PID_I=0; 
 PID_P=0; 
@@ -912,13 +736,13 @@ void SetDelayTime()
 delay(500);
 while(digitalRead(Enter)==0 )
 {
-SetupProgramNumber=7;
+SetupProgramNumber=6;
 
 } 
 delay(500); 
 while (digitalRead(Enter)==0 )
 {
-SetupProgramNumber=17;
+SetupProgramNumber=16;
 
 while (digitalRead(Up)==1 || digitalRead(Down)==1) 
 {
@@ -946,14 +770,14 @@ void SetCalibrationVoltage()
 delay(500) ; 
 while(digitalRead(Enter)==0 )
 {
-SetupProgramNumber=8;
+SetupProgramNumber=7;
 } 
 Read_Battery();
 VinBatteryError=Vin_Battery_Calibrated;
 delay(500); 
 while (digitalRead(Enter)==0 )
 {
-SetupProgramNumber=18;
+SetupProgramNumber=17;
 
 while (digitalRead(Up)==1 || digitalRead(Down)==1) 
 {
@@ -984,12 +808,12 @@ void SetContactorLatch()
 delay(500);
 while(digitalRead(Enter)==0 )
 {
-SetupProgramNumber=9;
+SetupProgramNumber=8;
 } 
 delay(500); 
 while (digitalRead(Enter)==0 )
 {
-SetupProgramNumber=19;
+SetupProgramNumber=18;
 
 while (digitalRead(Up)==1 || digitalRead(Down)==1) 
 {
@@ -1014,15 +838,11 @@ void EEPROM_Load()
 {
 EEPROM.get(0,cutVoltage);
 EEPROM.get(4,Setpoint); 
-//EEPROM.get(90,PID_MaxHeatingValue);
-EEPROM.get(8,SolarMaxPower);
-EEPROM.get(90,PID_MaxHeatingValue);
-IncreaseTimeInSeconds=EEPROM.read(10);
-DecreaseTimeInSeconds=EEPROM.read(30);
-//UtilityMaxPower=EEPROM.read(11);
-EEPROM.get(11,UtilityMaxPower);
-//PID_MaxHeatingValueUtility=EEPROM.read(120);
-EEPROM.get(120,PID_MaxHeatingValueUtility);
+SolarMaxPower=EEPROM.read(8);
+PID_MaxHeatingValue=EEPROM.read(9);
+SampleTimeInSeconds=EEPROM.read(10);
+UtilityMaxPower=EEPROM.read(11);
+PID_MaxHeatingValueUtility=EEPROM.read(12);
 EEPROM.get(13,DelayTime); 
 addError=EEPROM.read(15); 
 EEPROM.get(16,VinBatteryDifference);
@@ -1049,42 +869,35 @@ if (Setpoint<0 || Setpoint>70 || isnan(Setpoint) )
   EEPROM_Load();
 }
 
-if (SolarMaxPower<0 || SolarMaxPower>1000 || isnan(SolarMaxPower)) 
+if (SolarMaxPower<0 || SolarMaxPower>100 || isnan(SolarMaxPower)) 
 {
-  SolarMaxPower=750;
-  EEPROM.put(8,SolarMaxPower); 
+  SolarMaxPower=75;
+  EEPROM.write(8,SolarMaxPower); 
   EEPROM_Load();
 }
 if (PID_MaxHeatingValue<0 || PID_MaxHeatingValue>OCR1A_MaxValue || isnan(PID_MaxHeatingValue)) 
 {
-  PID_MaxHeatingValue=OCR1A_MaxValue - ( OCR1A_MaxValue * (SolarMaxPower/10.0)) /100.0;  // (2.5 = 255 / 100 )
-  EEPROM.put(90,PID_MaxHeatingValue); 
+  PID_MaxHeatingValue=OCR1A_MaxValue - ( OCR1A_MaxValue * SolarMaxPower) /100.0;  // (2.5 = 255 / 100 )
+  EEPROM.write(9,PID_MaxHeatingValue); 
   EEPROM_Load();
 }
-if (IncreaseTimeInSeconds<0 || IncreaseTimeInSeconds>100 || isnan(IncreaseTimeInSeconds)) 
+if (SampleTimeInSeconds<0 || SampleTimeInSeconds>100 || isnan(SampleTimeInSeconds)) 
 {
-  IncreaseTimeInSeconds=1;
-  EEPROM.write(10,IncreaseTimeInSeconds); 
+  SampleTimeInSeconds=1;
+  EEPROM.write(10,SampleTimeInSeconds); 
   EEPROM_Load();
 }
-
-if (DecreaseTimeInSeconds<0 || DecreaseTimeInSeconds>100 || isnan(DecreaseTimeInSeconds)) 
+if (UtilityMaxPower<0 || UtilityMaxPower>100 || isnan(UtilityMaxPower)) 
 {
-  DecreaseTimeInSeconds=1;
-  EEPROM.write(30,DecreaseTimeInSeconds); 
-  EEPROM_Load();
-}
-if (UtilityMaxPower<0 || UtilityMaxPower>1000 || isnan(UtilityMaxPower)) 
-{
-  UtilityMaxPower=1000;
-  EEPROM.put(11,UtilityMaxPower); 
+  UtilityMaxPower=100;
+  EEPROM.write(11,UtilityMaxPower); 
   EEPROM_Load();
 }
 
 if (PID_MaxHeatingValueUtility<0 || PID_MaxHeatingValueUtility>OCR1A_MaxValue || isnan(PID_MaxHeatingValueUtility)) 
 {
-  PID_MaxHeatingValueUtility=OCR1A_MaxValue - (OCR1A_MaxValue * (UtilityMaxPower/10.0)) /100.0;  // (2.5 = 255 / 100 )
-  EEPROM.put(120,PID_MaxHeatingValueUtility); 
+  PID_MaxHeatingValueUtility=OCR1A_MaxValue - (OCR1A_MaxValue * UtilityMaxPower) /100.0;  // (2.5 = 255 / 100 )
+  EEPROM.write(12,PID_MaxHeatingValueUtility); 
   EEPROM_Load();
 }
 
@@ -1112,7 +925,7 @@ if (VinBatteryDifference<0 || VinBatteryDifference>=70 || isnan(VinBatteryDiffer
 
  if (contactorEnableLowBattery<0 || contactorEnableLowBattery>1 || isnan(contactorEnableLowBattery)) 
 {
-  contactorEnableLowBattery=0;
+  contactorEnableLowBattery=1;
   EEPROM.write(20,contactorEnableLowBattery); 
   EEPROM_Load();
 }
@@ -1124,7 +937,7 @@ void PID_ComputeForUtility()
   /*How long since we last calculated*/
 now = millis();
 timeChange = (double)(now - lastTime);
-if (timeChange >= (IncreaseTimeInSeconds*1000))
+if (timeChange >= (SampleTimeInSeconds*1000))
 {
 accelerationValueUtility=PIDMaxValue / timetoReachMax ; 
 // when grid available just increment the heating power regarless of the battery we done
@@ -1190,7 +1003,7 @@ if (secondsFan>=fanTimeOff)
 }
 
 //---------------------------------STARTS FAN---------------------------------
-if (PWM_Value>0 && PWM_Value <OCR1A_MaxValue && HeatingPower >= 150)
+if (PWM_Value>0 && PWM_Value <OCR1A_MaxValue && HeatingPower >= 15)
  { 
   fanState=1; //heating is on so fan must turn on 
   currentMillisFan=millis();
@@ -1251,25 +1064,23 @@ Setpoint=54.0;
 }
 else SystemBatteryMode=24;
 /* Global Varaiables */
-SolarMaxPower=750;
-PID_MaxHeatingValue=OCR1A_MaxValue -  (OCR1A_MaxValue * (SolarMaxPower/10.0)) /100.0;  // old equation was : PID_MaxHeatingValue=OCR1A_MaxValue - ( (OCR1A_MaxValue/100) * SolarMaxPower);
-IncreaseTimeInSeconds=1;   //samples of pid controller taked snapshots 
-DecreaseTimeInSeconds=1;
-UtilityMaxPower=1000;     // max utility power 
-PID_MaxHeatingValueUtility=OCR1A_MaxValue - ( OCR1A_MaxValue * (UtilityMaxPower/10.0)) /100.0;  // (2.5 = 255 / 100 )
+SolarMaxPower=75;
+PID_MaxHeatingValue=OCR1A_MaxValue -  (OCR1A_MaxValue * SolarMaxPower) /100.0;  // old equation was : PID_MaxHeatingValue=OCR1A_MaxValue - ( (OCR1A_MaxValue/100) * SolarMaxPower);
+SampleTimeInSeconds=1;   //samples of pid controller taked snapshots 
+UtilityMaxPower=100;     // max utility power 
+PID_MaxHeatingValueUtility=OCR1A_MaxValue - ( OCR1A_MaxValue * UtilityMaxPower) /100.0;  // (2.5 = 255 / 100 )
 DelayTime=10;   // delay time to start the heater
 addError=1; 
 VinBatteryDifference=0; 
-contactorEnableLowBattery=0; 
+contactorEnableLowBattery=1; 
 /*ً Save Values to EEPROM */
 EEPROM.put(0,cutVoltage); 
 EEPROM.put(4,Setpoint); 
-EEPROM.put(8,SolarMaxPower); 
-EEPROM.put(90,PID_MaxHeatingValue);
-EEPROM.write(10,IncreaseTimeInSeconds); 
-EEPROM.write(30,DecreaseTimeInSeconds); 
-EEPROM.put(11,UtilityMaxPower); 
-EEPROM.put(120,PID_MaxHeatingValueUtility); 
+EEPROM.write(8,SolarMaxPower); 
+EEPROM.write(9,PID_MaxHeatingValue);
+EEPROM.write(10,SampleTimeInSeconds); 
+EEPROM.write(11,UtilityMaxPower); 
+EEPROM.write(12,PID_MaxHeatingValueUtility); 
 EEPROM.put(13,DelayTime); 
 EEPROM.write(15,addError);
 EEPROM.put(16,VinBatteryDifference);
