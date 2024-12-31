@@ -33,7 +33,7 @@ OneButton button = OneButton(
 //----------------------------------------Variables-------------------------------------------------
 byte A=A1,B=12,C=5,D=7,E=10,F=A0,G=6,H=4;   // define pins 
 byte Display_1=A2,Display_2=11,Display_3=13; // define display ports control 
-float Battery_Voltage=0,Vin_Battery=0;
+double Battery_Voltage=0,Vin_Battery=0;
 unsigned int  ADC_Value=0;  
 char txt[32];
 //Define Variables we'll be connecting to
@@ -91,6 +91,7 @@ char amplifeError=2; // to make error bigger when battery voltage is equal
 char fanisOn=0;
 double IncreaseTimeInSeconds = 1;  // Time interval for increasing PWM_Value
 double DecreaseTimeInSeconds = 1;  // Time interval for decreasing PWM_Value
+float Vin_Battery_=0.0;
 //--------------------------------------Functions Declartion---------------------------------------
 void Read_Battery();
 void AC_Control();
@@ -260,35 +261,34 @@ void Segment_Init()
   sevseg.setBrightness(0);  // for clearing flockering in display 
   }
 //---------------------------------------Read Battery Voltage-----------------------------------
-void Read_Battery()
-{
-unsigned char i=0;
-float sum=0 , Battery[100];
-float fanError=0; 
-for ( i=0; i<100 ; i++)
-{
-//currentMillisBattery=millis();
-//if(currentMillisBattery-prevoiusMillisBattery>= 100)
-//{ 
-//prevoiusMillisBattery=currentMillisBattery;
-ADC_Value=analogRead(A3);
-Battery_Voltage=(ADC_Value *5.0)/1023.0;
-Battery[i]=((10.5/0.5)*Battery_Voltage);
-sum+=Battery[i];
-delay(10);
-//} // end if millis 
-}  // end for  
-Vin_Battery=sum/100.0;
-//-> added this section because when fan starts it takes 
-if (fanisOn==1) fanError=0.065 ; else (fanError=0);  // for fan error 
-if (addError==1) Vin_Battery_Calibrated=Vin_Battery+VinBatteryDifference+fanError;
-else if(addError==0)  Vin_Battery_Calibrated=Vin_Battery-VinBatteryDifference+fanError;
 
+void Read_Battery() {
+    const int numSamples = 100;
+    float sum = 0;
+    float Battery[numSamples];
+    float fanError=0; 
+
+    for (int i = 0; i < numSamples; i++) {
+        ADC_Value = analogRead(A3);
+        Battery_Voltage = (ADC_Value * 5.0) / 1023.0;
+        Battery[i] = ((10.5 / 0.5) * Battery_Voltage);
+        sum += Battery[i];
+        delay(10);
+    }
+
+    Vin_Battery = sum / numSamples;
+
+    if (fanisOn==1) fanError=0.065 ; else (fanError=0);  // for fan error 
+
+    if (addError == 1) {
+        Vin_Battery_Calibrated = Vin_Battery + VinBatteryDifference + fanError;  // must add error fan 
+    } else {  // addError = 0
+        Vin_Battery_Calibrated = Vin_Battery - VinBatteryDifference + fanError;  // must add error fan 
+    }
 }
 //-------------------------------------Timer for updating screen reads--------------------------
 void Segment_Timer_Update ()
 {
-
  TCCR2B=0; 
  TCCR2B|= (1<<WGM21);   //choosing compare output mode for timer 2
  TCCR2B|= (1<<CS22) | (1 <<CS21 ) ;    //choosing 1024 prescalar so we can get 1 ms delay for updating Dipslay
@@ -298,11 +298,9 @@ void Segment_Timer_Update ()
  
  ISR(TIMER2_COMPA_vect) 
  {
-  
-    
+
     TCNT2=0;    // very important 
     ScreenTimer++;
-    
     if (SetupProgramNumber==1) 
     {
     sevseg.setChars("P01"); 
@@ -359,6 +357,7 @@ void Segment_Timer_Update ()
     if (SetupProgramNumber==10)    
     {
     sevseg.setNumberF(cutVoltage,1);
+    
     //sevseg.refreshDisplay(); 
     } 
     if (SetupProgramNumber==11)    
@@ -437,7 +436,7 @@ void Segment_Timer_Update ()
 
      if (displayVersionNumber==1)
     {
-      sevseg.setChars("V1.5");
+      sevseg.setChars("V1.6");
       //sevseg.refreshDisplay();
        esc++; 
       if (esc==1500)
@@ -949,6 +948,7 @@ while(digitalRead(Enter)==0 )
 SetupProgramNumber=8;
 } 
 Read_Battery();
+delay(500);
 VinBatteryError=Vin_Battery_Calibrated;
 delay(500); 
 while (digitalRead(Enter)==0 )
@@ -969,13 +969,21 @@ VinBatteryError-=0.1;
 }
 if (VinBatteryError > 70.0  ) VinBatteryError=70.0;
 if (VinBatteryError<0) VinBatteryError=0;
-if (VinBatteryError>=Vin_Battery_Calibrated) addError=1;    // add
-if (VinBatteryError<Vin_Battery_Calibrated) addError=0;    // minus
+if (VinBatteryError>=Vin_Battery)
+{
+ addError=1;    // add
+}else 
+{
+ addError=0; // minus 
+}
+//if (VinBatteryError<Vin_Battery_) addError=0;    // minus
 } // end while up and down
 }  // end while 
+delay(100);
 //save to eeprom 
-VinBatteryDifference=fabs(VinBatteryError-Vin_Battery_Calibrated);
+VinBatteryDifference=fabs(VinBatteryError - Vin_Battery);
 EEPROM.write(15,addError);
+delay(100);
 EEPROM.put(16,VinBatteryDifference);
 }  // end function 
 //-----------------------------------------CONTACTOR LATCH WHEN BATTERY LOW---------------------
